@@ -1,0 +1,46 @@
+# DocuTrack Registry — full stack.
+# v1 (simplified): FastAPI + Postgres + nginx-served React SPA.
+# Import/export run as in-process FastAPI background tasks (no Celery/Redis).
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: docutrack
+      POSTGRES_PASSWORD: docutrack
+      POSTGRES_DB: docutrack
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U docutrack"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  backend:
+    build: ./backend
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+psycopg2://docutrack:docutrack@db:5432/docutrack
+      SECRET_KEY: ${SECRET_KEY:-change-me-in-prod}
+      FIRST_ADMIN_EMAIL: ${FIRST_ADMIN_EMAIL:-admin@docutrack.local}
+      FIRST_ADMIN_PASSWORD: ${FIRST_ADMIN_PASSWORD:-ChangeMe!123}
+      ATTACHMENT_DIR: /data/attachments
+      JOB_DIR: /data/jobs
+      CORS_ORIGINS: http://localhost:8080
+    volumes:
+      - filestore:/data
+    ports:
+      - "8000:8000"
+
+  frontend:
+    build: ./frontend
+    depends_on:
+      - backend
+    ports:
+      - "8080:80"
+
+volumes:
+  pgdata:
+  filestore:

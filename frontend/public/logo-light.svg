@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 220" width="220" height="220" role="img" aria-label="RMS">
+  <!-- On-dark variant of the seal: light ring and ticks so it reads on the blue sidebar. -->
+  <circle cx="110" cy="110" r="98" fill="none" stroke="#eef2f9" stroke-width="3"/>
+  <g stroke="#eef2f9" stroke-width="2.4" stroke-linecap="round">
+    <line x1="110.0" y1="12.0" x2="110.0" y2="22.0"/>
+    <line x1="147.5" y1="19.5" x2="143.7" y2="28.7"/>
+    <line x1="179.3" y1="40.7" x2="172.2" y2="47.8"/>
+    <line x1="200.5" y1="72.5" x2="191.3" y2="76.3"/>
+    <line x1="208.0" y1="110.0" x2="198.0" y2="110.0"/>
+    <line x1="200.5" y1="147.5" x2="191.3" y2="143.7"/>
+    <line x1="179.3" y1="179.3" x2="172.2" y2="172.2"/>
+    <line x1="147.5" y1="200.5" x2="143.7" y2="191.3"/>
+    <line x1="110.0" y1="208.0" x2="110.0" y2="198.0"/>
+    <line x1="72.5" y1="200.5" x2="76.3" y2="191.3"/>
+    <line x1="40.7" y1="179.3" x2="47.8" y2="172.2"/>
+    <line x1="19.5" y1="147.5" x2="28.7" y2="143.7"/>
+    <line x1="12.0" y1="110.0" x2="22.0" y2="110.0"/>
+    <line x1="19.5" y1="72.5" x2="28.7" y2="76.3"/>
+    <line x1="40.7" y1="40.7" x2="47.8" y2="47.8"/>
+    <line x1="72.5" y1="19.5" x2="76.3" y2="28.7"/>
+  </g>
+  <circle cx="110" cy="110" r="78" fill="#33415a"/>
+  <circle cx="110" cy="110" r="72" fill="none" stroke="#f6b1ce" stroke-width="2"/>
+  <text x="110" y="128" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif"
+        font-size="58" font-weight="700" fill="#f7fafd" letter-spacing="1">RMS</text>
+  <path d="M 46 152 Q 110 176 174 152 L 174 168 Q 110 190 46 168 Z" fill="#9D5068"/>
+  <text x="110" y="167" text-anchor="middle" font-family="Arial, Helvetica, sans-serif"
+        font-size="10.5" font-weight="700" fill="#fbe9f0" letter-spacing="1.6">ON&#160;RECORD</text>
+</svg>

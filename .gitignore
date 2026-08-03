@@ -1,0 +1,22 @@
+# Python
+backend/.venv/
+__pycache__/
+*.pyc
+*.db
+backend/storage/
+.pytest_cache/
+
+# Secrets
+.env
+CREDENTIALS.txt
+
+# Node
+frontend/node_modules/
+frontend/dist/
+*.tsbuildinfo
+
+# Data references (large / sensitive)
+docutrack_records*.xlsx
+
+# OS
+.DS_Store

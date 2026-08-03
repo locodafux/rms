@@ -1,0 +1,1763 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DocuTrack — Filing & Scanning Registry</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  :root{
+    --navy:#16233A;--navy-2:#1E3350;--slate:#3E5C76;--paper:#F6F4EE;--paper-2:#EFEBE0;
+    --line:#D8D2C2;--gold:#B8912F;--gold-soft:#EADFBB;--ink:#1D2430;--ink-soft:#5B6472;
+    --red:#A5402C;--green:#3E6E4A;--white:#FFFFFF;--radius:3px;
+  }
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Serif:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--paper);color:var(--ink);font-family:'IBM Plex Sans',Arial,sans-serif;-webkit-font-smoothing:antialiased;}
+  .app{max-width:1440px;margin:0 auto;padding:22px 22px 60px;}
+
+  .masthead{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:3px solid var(--navy);padding-bottom:14px;margin-bottom:0;flex-wrap:wrap;gap:10px;}
+  .masthead h1{font-family:'IBM Plex Serif',serif;font-weight:700;font-size:26px;letter-spacing:0.3px;margin:0;color:var(--navy);}
+  .masthead .stamp{font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:1.5px;color:var(--gold);text-transform:uppercase;border:1px solid var(--gold);padding:3px 8px;border-radius:2px;}
+  .masthead .sub{font-size:12.5px;color:var(--ink-soft);margin-top:4px;}
+  .masthead-right{display:flex;flex-direction:column;align-items:flex-end;gap:6px;}
+  .win-controls{display:flex;gap:6px;}
+  .win-btn{width:28px;height:24px;border:1px solid var(--line);background:var(--white);border-radius:3px;cursor:pointer;font-size:13px;line-height:1;color:var(--navy);font-weight:600;}
+  .win-btn:hover{background:var(--paper-2);border-color:var(--navy);}
+  .app.maximized{position:fixed;inset:0;z-index:9999;max-width:100%;margin:0;padding:16px 22px 30px;overflow-y:auto;background:var(--paper);}
+  .resize-handle{height:11px;margin-top:-1px;cursor:row-resize;background:var(--paper-2);border:1px solid var(--line);border-top:none;border-radius:0 0 var(--radius) var(--radius);display:flex;align-items:center;justify-content:center;gap:3px;user-select:none;}
+  .resize-handle:hover{background:var(--gold-soft);}
+  .resize-handle span{width:16px;height:2px;background:var(--ink-soft);border-radius:1px;}
+  .pager{display:flex;align-items:center;gap:10px;padding:9px 4px 2px;font-size:12px;color:var(--ink-soft);}
+  .pager-info{font-family:'IBM Plex Mono',monospace;font-size:11px;}
+  .pager-page{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--ink);white-space:nowrap;}
+  .btn.small{padding:5px 10px;font-size:11.5px;}
+  .btn:disabled{opacity:.4;cursor:not-allowed;}
+  .rec-count{font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:var(--ink-soft);}
+
+  .tabs{display:flex;gap:4px;margin-top:0;}
+  .tab{font-family:'IBM Plex Serif',serif;font-weight:600;font-size:14.5px;padding:11px 22px 9px;background:var(--paper-2);color:var(--ink-soft);border:1px solid var(--line);border-bottom:none;border-radius:6px 6px 0 0;cursor:pointer;position:relative;top:1px;transition:background .15s,color .15s;}
+  .tab.active{background:var(--white);color:var(--navy);border-color:var(--navy);border-bottom:1px solid var(--white);}
+  .tab:not(.active):hover{background:#e6e1d2;color:var(--ink);}
+  .tab .n{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--gold);margin-left:6px;}
+
+  .panel{background:var(--white);border:1px solid var(--navy);border-radius:0 6px 6px 6px;padding:18px;}
+
+  .toolbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:14px;padding-bottom:14px;border-bottom:1px dashed var(--line);}
+  .toolbar input[type=text], .toolbar select{font-family:'IBM Plex Sans',sans-serif;padding:8px 10px;border:1px solid var(--line);border-radius:var(--radius);font-size:13px;background:var(--paper);color:var(--ink);}
+  .toolbar input[type=text]{min-width:220px;flex:1;}
+  .btn{font-family:'IBM Plex Sans',sans-serif;font-weight:600;font-size:13px;padding:9px 16px;border-radius:var(--radius);border:1px solid var(--navy);background:var(--navy);color:var(--white);cursor:pointer;transition:background .15s,transform .1s;white-space:nowrap;}
+  .btn:hover{background:var(--navy-2);}
+  .btn:active{transform:translateY(1px);}
+  .btn.secondary{background:var(--white);color:var(--navy);}
+  .btn.secondary:hover{background:var(--paper-2);}
+  .btn.gold{background:var(--gold);border-color:var(--gold);color:var(--white);}
+  .btn.gold:hover{background:#a17f28;}
+  .spacer{flex:1;}
+
+  .table-wrap{overflow:auto;border:1px solid var(--line);border-radius:var(--radius);max-height:480px;}
+  table{border-collapse:collapse;width:100%;min-width:1150px;font-size:12.5px;}
+  thead th{background:var(--navy);color:var(--gold-soft);text-align:left;padding:9px 10px;font-weight:600;font-size:11px;letter-spacing:.4px;text-transform:uppercase;position:sticky;top:0;white-space:nowrap;}
+  tbody td{padding:8px 10px;border-bottom:1px solid var(--line);white-space:nowrap;color:var(--ink);}
+  tbody tr:nth-child(even){background:#FBFAF6;}
+  tbody tr:hover{background:var(--gold-soft);cursor:pointer;}
+  .mono{font-family:'IBM Plex Mono',monospace;}
+  .empty-row td{text-align:center;padding:36px;color:var(--ink-soft);font-style:italic;cursor:default;}
+  .empty-row:hover{background:none;}
+
+  .badge{font-family:'IBM Plex Mono',monospace;font-size:10.5px;font-weight:600;padding:3px 8px;border-radius:20px;display:inline-block;letter-spacing:.3px;text-transform:uppercase;border:1px solid transparent;}
+  .b-reserved{background:#EAF1F6;color:#2A5D7A;border-color:#B7D3E3;}
+  .b-contracted{background:#EFF3E6;color:#4C6B2E;border-color:#CBDCAE;}
+  .b-booked{background:#E9F2EC;color:var(--green);border-color:#BFDBC7;}
+  .b-fallout,.b-backout,.b-cancelled{background:#FBEAE6;color:var(--red);border-color:#EBC3B8;}
+  .b-default{background:#F1EEE4;color:var(--ink-soft);border-color:var(--line);}
+  .b-complete{background:#E9F2EC;color:var(--green);border-color:#BFDBC7;}
+  .b-pending{background:#FBF3E1;color:#8A6212;border-color:#EAD8A6;}
+
+  .clip{font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:var(--slate);background:var(--paper-2);border:1px solid var(--line);border-radius:10px;padding:1px 7px;margin-left:6px;white-space:nowrap;}
+  .lock-note{display:inline-flex;align-items:center;gap:5px;font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:var(--ink-soft);}
+
+  /* Column filters */
+  .th-inner{display:flex;align-items:center;justify-content:space-between;gap:6px;}
+  .filter-btn{background:none;border:none;color:var(--gold-soft);cursor:pointer;font-size:11px;padding:2px 4px;border-radius:2px;line-height:1;}
+  .filter-btn:hover{background:rgba(255,255,255,.15);}
+  .filter-btn.active{color:var(--gold);background:rgba(184,145,47,.25);}
+  .filter-popover{display:none;position:absolute;z-index:70;background:var(--white);border:1px solid var(--navy);border-radius:6px;box-shadow:0 12px 30px rgba(0,0,0,.25);width:240px;padding:10px;}
+  .filter-popover.show{display:block;}
+  .filter-popover .fp-search{width:100%;font-size:12px;padding:6px 8px;border:1px solid var(--line);border-radius:var(--radius);margin-bottom:8px;font-family:'IBM Plex Sans',sans-serif;}
+  .fp-actions{display:flex;gap:10px;margin-bottom:6px;}
+  .fp-actions button{background:none;border:none;color:var(--slate);font-size:11px;font-weight:600;cursor:pointer;padding:0;text-decoration:underline;}
+  .fp-list{max-height:180px;overflow-y:auto;border-top:1px solid var(--line);border-bottom:1px solid var(--line);padding:6px 0;margin-bottom:8px;}
+  .fp-item{display:flex;align-items:center;gap:7px;font-size:12px;padding:3px 2px;cursor:pointer;}
+  .fp-item input{width:14px;height:14px;flex-shrink:0;}
+  .fp-buttons{display:flex;justify-content:flex-end;gap:8px;}
+
+  .row-actions button{font-family:'IBM Plex Sans',sans-serif;font-size:11.5px;font-weight:600;border:none;background:none;color:var(--slate);cursor:pointer;padding:2px 6px;}
+  .row-actions button:hover{color:var(--navy);text-decoration:underline;}
+
+  .overlay{display:none;position:fixed;inset:0;background:rgba(22,35,58,.55);z-index:50;align-items:flex-start;justify-content:center;padding:30px 16px;overflow-y:auto;}
+  .overlay.show{display:flex;}
+  .modal{background:var(--paper);width:100%;max-width:1040px;border-radius:6px;border:1px solid var(--navy);box-shadow:0 20px 50px rgba(0,0,0,.3);animation:pop .16s ease-out;}
+  @keyframes pop{from{transform:translateY(8px);opacity:0;}to{transform:translateY(0);opacity:1;}}
+  .modal-head{display:flex;justify-content:space-between;align-items:center;padding:16px 22px;border-bottom:2px solid var(--navy);background:var(--white);border-radius:6px 6px 0 0;}
+  .modal-head h2{font-family:'IBM Plex Serif',serif;font-size:19px;margin:0;color:var(--navy);}
+  .modal-head .x{cursor:pointer;font-size:20px;color:var(--ink-soft);background:none;border:none;}
+  .modal-body{padding:20px 22px;max-height:70vh;overflow-y:auto;}
+  .section{margin-bottom:22px;}
+  .section-title{font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:1.2px;text-transform:uppercase;color:var(--gold);font-weight:600;border-bottom:1px solid var(--line);padding-bottom:6px;margin-bottom:14px;}
+  .subsection-title{font-family:'IBM Plex Sans',sans-serif;font-size:11.5px;letter-spacing:.3px;text-transform:uppercase;color:var(--slate);font-weight:600;margin:14px 0 8px;}
+  .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px 16px;}
+  .field{display:flex;flex-direction:column;gap:4px;}
+  .field.span2{grid-column:span 2;}
+  .field.span3{grid-column:span 3;}
+  .field label{font-size:11px;font-weight:600;color:var(--ink-soft);letter-spacing:.2px;}
+  .field input, .field select, .field textarea{font-family:'IBM Plex Sans',sans-serif;font-size:13px;padding:8px 9px;border:1px solid var(--line);border-radius:var(--radius);background:var(--white);color:var(--ink);}
+  .field textarea{resize:vertical;min-height:38px;font-family:'IBM Plex Sans',sans-serif;}
+  .field input:focus, .field select:focus, .field textarea:focus{outline:2px solid var(--slate);outline-offset:0;border-color:var(--slate);}
+  .modal-foot{display:flex;justify-content:space-between;gap:10px;padding:16px 22px;border-top:1px solid var(--line);background:var(--white);border-radius:0 0 6px 6px;}
+  .req-note{font-size:11px;color:var(--ink-soft);margin-top:2px;}
+
+  /* Document checklist */
+  .checklist-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px 16px;}
+  .check-item{display:flex;align-items:center;gap:8px;font-size:12.5px;background:var(--white);border:1px solid var(--line);border-radius:var(--radius);padding:7px 9px;}
+  .check-item input[type=checkbox]{width:16px;height:16px;flex-shrink:0;accent-color:var(--gold);}
+  .check-item label{font-size:12.5px;font-weight:500;color:var(--ink);cursor:pointer;}
+
+  /* Attachments */
+  .dropzone{border:2px dashed var(--line);border-radius:6px;padding:18px;text-align:center;background:var(--white);cursor:pointer;transition:border-color .15s,background .15s;}
+  .dropzone:hover, .dropzone.drag{border-color:var(--gold);background:#FDFBF3;}
+  .dropzone .dz-title{font-weight:600;font-size:13px;color:var(--navy);}
+  .dropzone .dz-sub{font-size:11.5px;color:var(--ink-soft);margin-top:3px;}
+  .file-list{margin-top:12px;display:flex;flex-direction:column;gap:6px;}
+  .file-row{display:flex;align-items:center;gap:10px;background:var(--white);border:1px solid var(--line);border-radius:var(--radius);padding:7px 10px;font-size:12.5px;}
+  .file-row .fname{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:500;}
+  .file-row .fsize{font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:var(--ink-soft);}
+  .file-row a, .file-row button{font-size:11.5px;font-weight:600;border:none;background:none;cursor:pointer;padding:2px 4px;}
+  .file-row a{color:var(--slate);text-decoration:none;}
+  .file-row a:hover{text-decoration:underline;}
+  .file-row .locked{color:var(--ink-soft);font-family:'IBM Plex Mono',monospace;font-size:10px;}
+  .storage-meter{font-size:10.5px;color:var(--ink-soft);margin-top:8px;font-family:'IBM Plex Mono',monospace;}
+
+  /* Document preview */
+  .preview-overlay{display:none;position:fixed;inset:0;background:rgba(10,15,25,.85);z-index:60;align-items:center;justify-content:center;padding:30px;}
+  .preview-overlay.show{display:flex;}
+  .preview-box{max-width:92vw;max-height:88vh;display:flex;flex-direction:column;align-items:center;gap:10px;}
+  .preview-box img{max-width:92vw;max-height:78vh;border-radius:4px;box-shadow:0 10px 40px rgba(0,0,0,.5);}
+  .preview-box .pv-name{color:#fff;font-family:'IBM Plex Mono',monospace;font-size:12px;}
+  .preview-box .pv-close{background:var(--gold);border:none;color:#fff;padding:8px 18px;border-radius:3px;font-weight:600;cursor:pointer;font-size:13px;}
+  .preview-box iframe{width:80vw;height:78vh;border:none;border-radius:4px;background:#fff;}
+
+  /* Import modal */
+  .import-drop{border:2px dashed var(--line);border-radius:6px;padding:26px;text-align:center;background:var(--white);cursor:pointer;transition:border-color .15s,background .15s;}
+  .import-drop:hover, .import-drop.drag{border-color:var(--gold);background:#FDFBF3;}
+  .import-drop .dz-title{font-weight:600;font-size:14px;color:var(--navy);}
+  .import-drop .dz-sub{font-size:11.5px;color:var(--ink-soft);margin-top:4px;}
+  .import-step{display:none;}
+  .import-step.active{display:block;}
+  .import-summary{font-size:12.5px;color:var(--ink-soft);margin:10px 0 14px;}
+  .import-summary b{color:var(--navy);}
+  .map-table{width:100%;border-collapse:collapse;font-size:12.5px;}
+  .map-table th{text-align:left;font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.5px;text-transform:uppercase;color:var(--ink-soft);border-bottom:1px solid var(--line);padding:6px 8px;}
+  .map-table td{padding:6px 8px;border-bottom:1px solid var(--line);vertical-align:middle;}
+  .map-table select{width:100%;font-family:'IBM Plex Sans',sans-serif;font-size:12.5px;padding:6px 7px;border:1px solid var(--line);border-radius:var(--radius);background:var(--white);}
+  .map-table select.mapped{border-color:var(--green);}
+  .preview-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:var(--radius);margin-top:14px;max-height:220px;}
+  .preview-wrap table{border-collapse:collapse;width:100%;font-size:11.5px;}
+  .preview-wrap th{position:sticky;top:0;background:var(--navy);color:var(--gold-soft);padding:6px 8px;text-align:left;white-space:nowrap;font-size:10.5px;text-transform:uppercase;}
+  .preview-wrap td{padding:6px 8px;border-bottom:1px solid var(--line);white-space:nowrap;}
+  .import-checkline{display:flex;align-items:center;gap:8px;font-size:12.5px;margin:14px 0;}
+  .import-checkline input{width:15px;height:15px;}
+  .link-btn{background:none;border:none;color:var(--slate);font-size:12px;font-weight:600;cursor:pointer;padding:0;text-decoration:underline;}
+  .link-btn:hover{color:var(--navy);}
+
+  @media (max-width:760px){
+    .grid, .checklist-grid{grid-template-columns:1fr;}
+    .field.span2, .field.span3{grid-column:span 1;}
+    table{min-width:900px;}
+  }
+</style>
+</head>
+<body>
+<div class="app" id="appRoot">
+
+  <div class="masthead">
+    <div>
+      <h1>DocuTrack Registry</h1>
+      <div class="sub">Unit documentation — filing, scanning & archive tracker</div>
+    </div>
+    <div class="masthead-right">
+      <div class="win-controls">
+        <button class="win-btn" id="minimizeBtn" onclick="toggleMinimize()" title="Minimize">─</button>
+        <button class="win-btn" id="maximizeBtn" onclick="toggleMaximize()" title="Maximize">⛶</button>
+      </div>
+      <span class="stamp">Shared record book</span>
+      <span class="rec-count" id="recCount">0 records on file</span>
+      <span class="lock-note">🔒 Entries &amp; documents are permanent — nothing can be deleted</span>
+    </div>
+  </div>
+
+  <div id="appBody">
+  <div class="tabs">
+    <div class="tab active" id="tabBtn-filing" onclick="switchTab('filing')">Filing System Entry <span class="n" id="cnt-filing">0</span></div>
+    <div class="tab" id="tabBtn-scanning" onclick="switchTab('scanning')">Scanning of Document Entry <span class="n" id="cnt-scanning">0</span></div>
+  </div>
+
+  <div class="panel">
+    <div class="toolbar">
+      <input type="text" id="searchInput" placeholder="Search unit code, name, project…" oninput="currentPage=1; renderTable()">
+      <button class="btn secondary" id="clearFiltersBtn" onclick="clearColumnFilters()" style="display:none;">Clear Column Filters</button>
+      <span class="spacer"></span>
+      <button class="btn secondary" onclick="openDocumentsLibrary()">📎 Uploaded Documents</button>
+      <button class="btn secondary" onclick="openImportModal()">Import Excel / CSV</button>
+      <button class="btn secondary" onclick="exportXLSX()">Export Excel</button>
+      <button class="btn secondary" onclick="exportCSV()">Export CSV</button>
+      <button class="btn gold" onclick="openModal()">+ New Entry</button>
+    </div>
+    <p class="req-note" style="margin:-6px 0 12px;">Click the ▾ on any column header to filter that column, Excel-style. The header row stays frozen as you scroll — drag the bar below the table to resize it.</p>
+
+    <div class="table-wrap" id="tableWrap">
+      <table>
+        <thead id="thead"></thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
+    <div class="pager" id="tablePager"></div>
+    <div class="resize-handle" id="resizeHandle" title="Drag to resize table height"><span></span><span></span><span></span></div>
+  </div>
+
+  <p class="req-note" style="margin-top:14px;">Data and uploaded documents are stored centrally — everyone using this app sees the same entries. Once an entry or a document is saved, it stays on file; there is no delete option for either, by design.</p>
+  </div>
+</div>
+
+<!-- Column filter popover -->
+<div class="filter-popover" id="filterPopover">
+  <input type="text" class="fp-search" placeholder="Search values…" oninput="filterPopoverSearch(this.value)">
+  <div class="fp-actions"><button type="button" onclick="fpSelectAll()">Select All</button><button type="button" onclick="fpClear()">Clear</button></div>
+  <div class="fp-list" id="fpList"></div>
+  <div class="fp-buttons">
+    <button class="btn small secondary" type="button" onclick="closeFilterPopover()">Cancel</button>
+    <button class="btn small gold" type="button" onclick="applyFilterPopover()">Apply</button>
+  </div>
+</div>
+
+<!-- Entry Modal -->
+<div class="overlay" id="overlay">
+  <div class="modal">
+    <div class="modal-head">
+      <h2 id="modalTitle">New Entry</h2>
+      <button class="x" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <form id="entryForm">
+
+        <div class="section">
+          <div class="section-title">Unit and Project Information</div>
+          <div class="grid">
+            <div class="field"><label>Unit Code</label><input name="unitCode" required></div>
+            <div class="field"><label>Company</label><input name="company" list="dl-company"></div>
+            <div class="field"><label>Geo</label>
+              <select name="geo"><option value=""></option><option>SOMA1</option><option>SOMA2</option><option>SOMA3</option><option>NOMA1</option><option>NOMA2</option></select>
+            </div>
+            <div class="field"><label>Project Name</label><input name="projectName" list="dl-projectName"></div>
+            <div class="field"><label>Unit</label><input name="unit" list="dl-unit"></div>
+            <div class="field"><label>Type</label><input name="type" list="dl-type"></div>
+            <div class="field"><label>Phase</label><input name="phase" list="dl-phase"></div>
+            <div class="field"><label>Sub Phase</label><input name="subPhase" list="dl-subPhase"></div>
+            <div class="field"><label>Batch</label><input name="batch" list="dl-batch"></div>
+            <div class="field"><label>Unit Status</label>
+              <select name="unitStatus">
+                <option value=""></option>
+                <option>Reserved</option><option>Contracted</option><option>Booked</option>
+                <option>Fallout</option><option>Backout</option><option>Cancelled</option>
+              </select>
+            </div>
+            <div class="field"><label>Reserved Date</label><input type="date" name="reservedDate"></div>
+            <div class="field"><label>Contracted Date</label><input type="date" name="contractedDate"></div>
+            <div class="field"><label>Booked Date</label><input type="date" name="bookedDate"></div>
+            <div class="field"><label>Withdrawal Date</label><input type="date" name="withdrawalDate"></div>
+            <div class="field"><label>Bank Finance</label><input name="bankFinance" list="dl-bankFinance"></div>
+            <div class="field"><label>TCP</label><input name="tcp"></div>
+            <div class="field"><label>LA</label><input name="la"></div>
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="section-title">Buyer's Information</div>
+          <div class="grid">
+            <div class="field"><label>Last Name</label><input name="lastName"></div>
+            <div class="field"><label>Suffix</label><input name="suffix" list="dl-suffix"></div>
+            <div class="field"><label>First Name</label><input name="firstName"></div>
+            <div class="field"><label>Middle Name</label><input name="middleName"></div>
+            <div class="field"><label>Citizenship</label><input name="citizenship" list="dl-citizenship"></div>
+            <div class="field"><label>Civil Status</label><input name="civilStatus" list="dl-civilStatus"></div>
+            <div class="field"><label>Gender</label><input name="gender" list="dl-gender"></div>
+            <div class="field"><label>Employment</label><input name="employment" list="dl-employment"></div>
+            <div class="field"><label>Contact Number</label><input name="contactNumber"></div>
+            <div class="field"><label>Email Address of Principal Buyer</label><input type="email" name="emailPrincipal"></div>
+            <div class="field"><label>Email Address of Co-buyer</label><input type="email" name="emailCoBuyer"></div>
+            <div class="field span3"><label>Address</label><textarea name="address"></textarea></div>
+            <div class="field span3"><label>Remarks</label><textarea name="remarksBuyer"></textarea></div>
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="section-title">BOI Status</div>
+          <div class="grid">
+            <div class="field"><label>BOI Start of Commercial Operations</label><input type="date" name="boiStart"></div>
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="section-title">Compliance Team</div>
+
+          <div class="subsection-title">Officer &amp; Dates</div>
+          <div class="grid">
+            <div class="field"><label>Doc Compliance Officer</label><input name="docComplianceOfficer" list="dl-docComplianceOfficer"></div>
+            <div class="field"><label>Date Received from SAS</label><input type="date" name="dateReceivedSAS"></div>
+            <div class="field"><label>Date Transmitted to Scanning</label><input type="date" name="dateTransmittedToScanning"></div>
+            <div class="field"><label>Cleared Date</label><input type="date" name="clearedDate"></div>
+            <div class="field"><label>Account Location</label><input name="accountLocation" list="dl-accountLocation"></div>
+            <div class="field"><label>Mode of Payment</label>
+              <select name="modeOfPayment"><option value=""></option><option>ADA</option><option>spot cash</option><option>PDC</option></select>
+            </div>
+          </div>
+
+          <div class="subsection-title">Document Checklist</div>
+          <div class="checklist-grid" id="docChecklist"></div>
+
+          <div class="subsection-title">Valid IDs</div>
+          <div class="grid">
+            <div class="field"><label>PB Valid ID — Primary</label><input name="pbValidIdPrimary" list="dl-validid"></div>
+            <div class="field"><label>PB Valid ID — Secondary</label><input name="pbValidIdSecondary" list="dl-validid"></div>
+            <div class="field"></div>
+            <div class="field"><label>SPS Valid ID — Primary</label><input name="spsValidIdPrimary" list="dl-validid"></div>
+            <div class="field"><label>SPS Valid ID — Secondary</label><input name="spsValidIdSecondary" list="dl-validid"></div>
+            <div class="field"></div>
+            <div class="field"><label>CB1 Valid ID — Primary</label><input name="cb1ValidIdPrimary" list="dl-validid"></div>
+            <div class="field"><label>CB1 Valid ID — Secondary</label><input name="cb1ValidIdSecondary" list="dl-validid"></div>
+            <div class="field"></div>
+            <div class="field"><label>CB2 Valid ID — Primary</label><input name="cb2ValidIdPrimary" list="dl-validid"></div>
+            <div class="field"><label>CB2 Valid ID — Secondary</label><input name="cb2ValidIdSecondary" list="dl-validid"></div>
+            <div class="field"></div>
+            <div class="field"><label>AIF Valid ID — Primary</label><input name="aifValidIdPrimary" list="dl-validid"></div>
+            <div class="field"><label>AIF Valid ID — Secondary</label><input name="aifValidIdSecondary" list="dl-validid"></div>
+          </div>
+
+          <div class="grid" style="margin-top:12px;">
+            <div class="field span3"><label>Lacking Remarks</label><textarea name="lackingRemarks"></textarea></div>
+          </div>
+
+          <div class="subsection-title">SPA</div>
+          <div class="grid">
+            <div class="field"><label>SPA Status</label>
+              <select name="spaStatus">
+                <option value=""></option><option>N/A</option><option>Pending Preparation</option>
+                <option>For Signing</option><option>Signed</option><option>Released</option><option>Notarized</option>
+              </select>
+            </div>
+            <div class="field"><label>SPA Type</label>
+              <select name="spaType"><option value=""></option><option>NISPA</option><option>CISPA</option><option>APOSTILLE</option><option>NSPA</option></select>
+            </div>
+            <div class="field"><label>SPA No. of Copies</label><input type="number" min="0" name="spaCopies"></div>
+            <div class="field"><label>Date Transmitted for Scanning</label><input type="date" name="dateTransmittedForScanning"></div>
+            <div class="field span3"><label>SPA Remarks</label><textarea name="spaRemarks"></textarea></div>
+            <div class="field span3"><label>Remarks</label><textarea name="complianceRemarks"></textarea></div>
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="section-title">Scanning of Documents Entry</div>
+          <div class="grid">
+            <div class="field span2"><label>Docket Scanning Status</label>
+              <select name="docketScanningStatus">
+                <option value=""></option>
+                <option>no docket/CPA yet</option><option>pending scanning</option>
+                <option>scanned - fallout</option><option>scanned - backout</option>
+                <option>scanned - cancelled</option><option>scanned - w/ RDU</option>
+                <option>scanned - complete</option><option>fallout</option>
+                <option>backout</option><option>cancelled</option>
+                <option>transferred</option><option>rebooked</option>
+              </select>
+            </div>
+            <div class="field"><label>Scanning AO</label><input name="scanningAO" list="dl-scanningAO"></div>
+            <div class="field"><label>Date Received</label><input type="date" name="dateReceivedScanning"></div>
+            <div class="field"><label>Date Scanned</label><input type="date" name="dateScanned"></div>
+            <div class="field span2"><label>Remarks</label><textarea name="scanningRemarks"></textarea></div>
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="section-title">Notary Status</div>
+          <div class="grid">
+            <div class="field"><label>Notary Status</label><input name="notaryStatus" list="dl-notaryStatus"></div>
+            <div class="field"><label>Account Officer</label><input name="accountOfficer" list="dl-accountOfficer"></div>
+            <div class="field"><label>NCPA Notary Date</label><input type="date" name="ncpaNotaryDate"></div>
+            <div class="field"><label>Endorsement Date</label><input type="date" name="endorsementDate"></div>
+            <div class="field"><label>NCPA Email Sent Date</label><input type="date" name="ncpaEmailSentDate"></div>
+            <div class="field"><label>Notarized By</label><input name="notarizedBy" list="dl-notarizedBy"></div>
+            <div class="field span3"><label>Remarks</label><textarea name="notaryRemarks"></textarea></div>
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="section-title">Filing System Entry</div>
+          <div class="grid">
+            <div class="field"><label>Filing &amp; Archiving Officer</label><input name="filingArchivingOfficer" list="dl-filingArchivingOfficer"></div>
+            <div class="field"><label>File Status</label>
+              <select name="fileStatus">
+                <option value=""></option>
+                <option>No Docket yet</option><option>Archived</option><option>For Archiving</option>
+                <option>For Filing</option><option>On File - Complete</option><option>On File - W/ RDU</option>
+                <option>On File - W/ Lacking</option>
+              </select>
+            </div>
+            <div class="field"><label>Date Filed</label><input type="date" name="dateFiled"></div>
+            <div class="field"><label>Location</label><input name="filingLocation" list="dl-filingLocation"></div>
+          </div>
+
+          <div class="subsection-title">Pullout Request</div>
+          <div class="grid">
+            <div class="field"><label>Requested By</label><input name="pulloutRequestedBy"></div>
+            <div class="field"><label>Type of Documents</label><input name="pulloutDocumentType" list="dl-pulloutDocumentType"></div>
+            <div class="field"><label>Requesting Dept/Group</label><input name="pulloutRequestingDept" list="dl-pulloutRequestingDept"></div>
+            <div class="field"><label>Request Date</label><input type="date" name="pulloutRequestDate"></div>
+            <div class="field"><label>Date Pullout</label><input type="date" name="pulloutDate"></div>
+            <div class="field"><label>Returned Docs</label><input name="pulloutReturnedDocs"></div>
+            <div class="field span3"><label>Remarks</label><input name="pulloutRemarks"></div>
+          </div>
+
+          <div class="subsection-title">DOAS Notary Status</div>
+          <div class="grid">
+            <div class="field"><label>DOAS Pullout By</label><input name="doasPulloutBy"></div>
+            <div class="field"><label>Requested Date Pullout</label><input type="date" name="doasRequestedPulloutDate"></div>
+            <div class="field"><label>DOAS Status</label>
+              <select name="doasStatus"><option value=""></option><option>Pending Notary</option><option>Notarized</option></select>
+            </div>
+            <div class="field"><label>N-DOAS Date Returned</label><input type="date" name="ndoasDateReturned"></div>
+            <div class="field"><label>Return By</label><input name="doasReturnBy"></div>
+            <div class="field span2"><label>Remarks</label><input name="doasRemarks"></div>
+          </div>
+
+          <div class="subsection-title">Archiving / Disposal</div>
+          <div class="grid">
+            <div class="field"><label>Accounts Status</label>
+              <select name="archivingAccountsStatus"><option value=""></option><option>fallout</option><option>backout</option><option>cancelled</option></select>
+            </div>
+            <div class="field"><label>Pullout Date</label><input type="date" name="archivingPulloutDate"></div>
+            <div class="field"><label>Archived Date</label><input type="date" name="archivedDate"></div>
+            <div class="field"><label>Location</label><input name="archivingLocation" list="dl-filingLocation"></div>
+            <div class="field"><label>Date Disposal</label><input type="date" name="dateDisposal"></div>
+            <div class="field span3"><label>Remarks</label><textarea name="archivingRemarks"></textarea></div>
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="section-title">BOI Status Entry</div>
+          <div class="grid">
+            <div class="field"><label>BOI Status</label>
+              <select name="boiStatusFiling"><option value=""></option><option>pending</option><option>submitted</option></select>
+            </div>
+            <div class="field"><label>BOI Date Submitted</label><input type="date" name="boiDateSubmitted"></div>
+            <div class="field"><label>BOI (NCPA Submitted) To</label><input name="boiNcpaSubmittedTo"></div>
+            <div class="field span3"><label>Remarks</label><textarea name="boiEntryRemarks"></textarea></div>
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="section-title">Attachments — Scanned Documents</div>
+          <div class="dropzone" id="dropzone" onclick="document.getElementById('fileInput').click()">
+            <div class="dz-title">Click to upload, or drag documents here</div>
+            <div class="dz-sub">Scanned SPA, IDs, docket sheets — PDF or image files, up to 10MB each. No limit on how many you attach. Once uploaded, a file stays on record and can't be removed.</div>
+            <input type="file" id="fileInput" multiple style="display:none" onchange="onFileInputChange(event)">
+          </div>
+          <div class="file-list" id="fileList"></div>
+          <div class="storage-meter" id="storageMeter"></div>
+        </div>
+
+      </form>
+
+      <datalist id="dl-company"></datalist><datalist id="dl-projectName"></datalist>
+      <datalist id="dl-unit"></datalist><datalist id="dl-type"></datalist>
+      <datalist id="dl-phase"></datalist><datalist id="dl-subPhase"></datalist>
+      <datalist id="dl-batch"></datalist><datalist id="dl-bankFinance"></datalist>
+      <datalist id="dl-accountLocation"></datalist><datalist id="dl-suffix"></datalist>
+      <datalist id="dl-citizenship"></datalist><datalist id="dl-civilStatus"></datalist>
+      <datalist id="dl-gender"></datalist><datalist id="dl-employment"></datalist>
+      <datalist id="dl-docComplianceOfficer"></datalist>
+      <datalist id="dl-scanningAO"></datalist><datalist id="dl-notaryStatus"></datalist>
+      <datalist id="dl-accountOfficer"></datalist><datalist id="dl-notarizedBy"></datalist>
+      <datalist id="dl-filingArchivingOfficer"></datalist><datalist id="dl-filingLocation"></datalist>
+      <datalist id="dl-pulloutRequestingDept"></datalist><datalist id="dl-pulloutDocumentType"></datalist>
+      <datalist id="dl-validid">
+        <option value="Passport"><option value="Driver's License"><option value="UMID">
+        <option value="SSS ID"><option value="GSIS ID"><option value="PRC ID">
+        <option value="Voter's ID"><option value="Postal ID"><option value="PhilHealth ID">
+        <option value="National ID (PhilSys)"><option value="TIN ID"><option value="Senior Citizen ID">
+        <option value="OFW ID"><option value="Company ID">
+      </datalist>
+    </div>
+    <div class="modal-foot">
+      <span class="lock-note">🔒 No delete option — entries are permanent once saved</span>
+      <span class="spacer"></span>
+      <button class="btn secondary" onclick="closeModal()">Cancel</button>
+      <button class="btn gold" onclick="saveEntry(event)">Save Entry</button>
+    </div>
+  </div>
+</div>
+
+<!-- Import (Excel/CSV) Modal -->
+<div class="overlay" id="importOverlay">
+  <div class="modal">
+    <div class="modal-head">
+      <h2>Import Records from Excel / CSV</h2>
+      <button class="x" onclick="closeImportModal()">✕</button>
+    </div>
+    <div class="modal-body">
+
+      <div class="import-step active" id="importStep1">
+        <div class="import-drop" id="importDrop" onclick="document.getElementById('importFileInput').click()">
+          <div class="dz-title">Click to upload, or drag a .xlsx, .xls, or .csv file here</div>
+          <div class="dz-sub">The first row of your sheet should be column headers</div>
+          <input type="file" id="importFileInput" accept=".xlsx,.xls,.csv" style="display:none" onchange="onImportFileChange(event)">
+        </div>
+        <p class="req-note" style="margin-top:12px;">Not sure how to format your sheet? <button class="link-btn" onclick="downloadTemplate()">Download a blank import template</button> with all the registry's column names already set up.</p>
+      </div>
+
+      <div class="import-step" id="importStep2">
+        <div class="import-summary">Found <b id="importRowCount">0</b> row(s) in <b id="importFileName"></b>. Match each column from your file to a field in the registry — we've guessed where we could. Columns left as "Skip" are not imported.</div>
+        <div class="table-wrap" style="max-height:280px;overflow-y:auto;">
+          <table class="map-table">
+            <thead><tr><th style="width:35%">Your column</th><th>Maps to</th></tr></thead>
+            <tbody id="mapTableBody"></tbody>
+          </table>
+        </div>
+        <label class="import-checkline">
+          <input type="checkbox" id="updateExistingChk" checked>
+          Update existing records when Unit Code already exists in the registry (otherwise a new record is always created)
+        </label>
+        <div class="preview-wrap"><table id="previewTable"></table></div>
+      </div>
+
+    </div>
+    <div class="modal-foot">
+      <button class="btn secondary" id="importBackBtn" style="display:none;" onclick="importBackToStep1()">Choose a Different File</button>
+      <span class="spacer"></span>
+      <button class="btn secondary" onclick="closeImportModal()">Cancel</button>
+      <button class="btn gold" id="importRunBtn" style="display:none;" onclick="runImport()">Import Records</button>
+    </div>
+  </div>
+</div>
+
+<!-- Documents Library -->
+<div class="overlay" id="libraryOverlay">
+  <div class="modal">
+    <div class="modal-head">
+      <h2 id="libraryTitle">Uploaded Documents</h2>
+      <button class="x" onclick="closeDocumentsLibrary()">✕</button>
+    </div>
+    <div class="modal-body" id="libraryBody"></div>
+    <div class="modal-foot">
+      <span class="lock-note">🔒 Documents are permanent — every scanned file ever uploaded stays listed here</span>
+      <span class="spacer"></span>
+      <button class="btn secondary" onclick="closeDocumentsLibrary()">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- Document preview -->
+<div class="preview-overlay" id="previewOverlay" onclick="if(event.target.id==='previewOverlay')closePreview()">
+  <div class="preview-box" id="previewBox"></div>
+</div>
+
+<script>
+const STORE_KEY = 'docutrack:records'; // legacy single-key format, read once for migration only
+const FILES_PREFIX = 'docutrack:files:'; // legacy single-key format, kept only for reading older uploads
+
+let records = [];
+let currentTab = 'filing';
+let currentPage = 1;
+const ROWS_PER_PAGE = 100;
+let modalRecordId = null;
+let modalIsNew = false;
+let modalAttachments = [];
+
+const DOC_CHECKLIST = [
+  {key:'docBuyersInfoSheet', label:"Buyer's Info Sheet"},
+  {key:'docCoBuyersInfoSheet', label:"Co-Buyer Info Sheet"},
+  {key:'docComputationSheet', label:'Computation Sheet'},
+  {key:'docCPA', label:'CPA'},
+  {key:'docBuyersGuide', label:"Buyer's Guide"},
+  {key:'docHouseSpecs', label:'House Specs'},
+  {key:'docDOASForm', label:'DOAS'},
+  {key:'docUHLA', label:'UHLA'},
+  {key:'docCBUHLA', label:'CB-UHLA'},
+  {key:'docBIR1904', label:'BIR 1904'},
+  {key:'docBIR2316', label:'BIR 2316'},
+  {key:'docCB1904', label:'CB 1904'},
+  {key:'docCBBIR2316', label:'CB BIR 2316'},
+  {key:'docPBCenomar', label:'PB CENOMAR'},
+  {key:'docCBCenomar', label:'CB CENOMAR'},
+  {key:'docPBMarriageCert', label:'PB Marriage Certificate'},
+  {key:'docCBMarriageCert', label:'CB Marriage Certificate'},
+  {key:'docPBCOE', label:'PB COE'},
+  {key:'docCBCOE', label:'CB COE'},
+  {key:'docPBPayslip', label:'PB Payslip'},
+  {key:'docCBPayslip', label:'CB Payslip'},
+  {key:'docProofOfBilling', label:'Proof of Billing'},
+  {key:'docBankStatement', label:'Bank Statement'},
+  {key:'docAnnualFinancialStatement', label:'Annual Financial Statement'},
+  {key:'docBusinessITR', label:'Business ITR'},
+  {key:'docDTISECCert', label:'DTI / SEC Cert'},
+  {key:'docExitEntryStamp', label:'Exit and Entry Stamp'}
+];
+
+const DL_FIELDS = ['company','projectName','unit','type','phase','subPhase','batch','bankFinance',
+  'accountLocation','suffix','citizenship','civilStatus','gender','employment',
+  'docComplianceOfficer','scanningAO','notaryStatus','accountOfficer','notarizedBy',
+  'filingArchivingOfficer','filingLocation','pulloutRequestingDept','pulloutDocumentType'];
+
+const DEFAULT_SUGGESTIONS = {
+  company:['PPHI','CPC','TANZA'],
+  unit:['Alora','Amani','Aurora','Brenna','Calista','Cartland','Charles','Christie','Corin','Dua','Unna'],
+  type:['Cartland','Charles','Christie','Corner','Dua','End','End Corner','Mid','Regular'],
+  bankFinance:['BF','DC','SC','IHF 1','IHF 2','IHF 3','PIF'],
+  citizenship:['Filipino','Foreign National','Dual Citizen'],
+  civilStatus:['Single','Married','Separated','Widowed','Annulled','Divorce','Non-Individual'],
+  gender:['Male','Female'],
+  employment:['Locally Employed','Self Employed','OFW','Retirement Income','With Financial Support','Allowance from Parent'],
+  docComplianceOfficer:['Stephen Ifurung','Michael Palomeras'],
+  scanningAO:['Ann Carla Herbuela','Mildred Mago'],
+  notaryStatus:['Awaiting BOI','For Execution','For Notarization','For Signature','No Docket/CPA yet',
+    'Notarized','Notarized - Backout','Notarized - Cancelled','Notarized Fallout','Notarized & Email Sent'],
+  suffix:['Jr.','Sr.','II','III'],
+  filingArchivingOfficer:['Arnulfo Ajero','CJ James Salazar','Mark Bryan Morada'],
+  pulloutDocumentType:['Original SPA','Photocopy','Certified True Copy']
+};
+
+const FIELD_DEFS = [
+  {key:'unitCode', label:'Unit Code'},
+  {key:'company', label:'Company'},
+  {key:'geo', label:'Geo'},
+  {key:'projectName', label:'Project Name'},
+  {key:'unit', label:'Unit'},
+  {key:'type', label:'Type'},
+  {key:'phase', label:'Phase'},
+  {key:'subPhase', label:'Sub Phase'},
+  {key:'batch', label:'Batch'},
+  {key:'unitStatus', label:'Unit Status'},
+  {key:'reservedDate', label:'Reserved Date', type:'date'},
+  {key:'contractedDate', label:'Contracted Date', type:'date'},
+  {key:'bookedDate', label:'Booked Date', type:'date'},
+  {key:'withdrawalDate', label:'Withdrawal Date', type:'date'},
+  {key:'bankFinance', label:'Bank Finance'},
+  {key:'tcp', label:'TCP'},
+  {key:'la', label:'LA'},
+  {key:'lastName', label:'Last Name'},
+  {key:'suffix', label:'Suffix'},
+  {key:'firstName', label:'First Name'},
+  {key:'middleName', label:'Middle Name'},
+  {key:'citizenship', label:'Citizenship'},
+  {key:'civilStatus', label:'Civil Status'},
+  {key:'gender', label:'Gender'},
+  {key:'employment', label:'Employment'},
+  {key:'contactNumber', label:'Contact Number'},
+  {key:'emailPrincipal', label:'Email Address of Principal Buyer'},
+  {key:'emailCoBuyer', label:'Email Address of Co-buyer'},
+  {key:'address', label:'Address'},
+  {key:'remarksBuyer', label:'Remarks (Buyer)'},
+  {key:'boiStart', label:'BOI Start of Commercial Operations', type:'date'},
+  {key:'docComplianceOfficer', label:'Doc Compliance Officer'},
+  {key:'dateReceivedSAS', label:'Date Received from SAS', type:'date'},
+  {key:'dateTransmittedToScanning', label:'Date Transmitted to Scanning', type:'date'},
+  {key:'clearedDate', label:'Cleared Date', type:'date'},
+  {key:'accountLocation', label:'Account Location'},
+  {key:'modeOfPayment', label:'Mode of Payment'},
+  {key:'pbValidIdPrimary', label:'PB Valid ID Primary'},
+  {key:'pbValidIdSecondary', label:'PB Valid ID Secondary'},
+  {key:'spsValidIdPrimary', label:'SPS Valid ID Primary'},
+  {key:'spsValidIdSecondary', label:'SPS Valid ID Secondary'},
+  {key:'cb1ValidIdPrimary', label:'CB1 Valid ID Primary'},
+  {key:'cb1ValidIdSecondary', label:'CB1 Valid ID Secondary'},
+  {key:'cb2ValidIdPrimary', label:'CB2 Valid ID Primary'},
+  {key:'cb2ValidIdSecondary', label:'CB2 Valid ID Secondary'},
+  {key:'aifValidIdPrimary', label:'AIF Valid ID Primary'},
+  {key:'aifValidIdSecondary', label:'AIF Valid ID Secondary'},
+  {key:'lackingRemarks', label:'Lacking Remarks'},
+  {key:'spaStatus', label:'SPA Status'},
+  {key:'spaType', label:'SPA Type'},
+  {key:'spaCopies', label:'SPA No. of Copies'},
+  {key:'dateTransmittedForScanning', label:'Date Transmitted for Scanning', type:'date'},
+  {key:'spaRemarks', label:'SPA Remarks'},
+  {key:'complianceRemarks', label:'Compliance Team Remarks'},
+  {key:'docketScanningStatus', label:'Docket Scanning Status'},
+  {key:'scanningAO', label:'Scanning AO'},
+  {key:'dateReceivedScanning', label:'Date Received (Scanning)', type:'date'},
+  {key:'dateScanned', label:'Date Scanned', type:'date'},
+  {key:'scanningRemarks', label:'Scanning Remarks'},
+  {key:'notaryStatus', label:'Notary Status'},
+  {key:'accountOfficer', label:'Account Officer'},
+  {key:'ncpaNotaryDate', label:'NCPA Notary Date', type:'date'},
+  {key:'endorsementDate', label:'Endorsement Date', type:'date'},
+  {key:'ncpaEmailSentDate', label:'NCPA Email Sent Date', type:'date'},
+  {key:'notarizedBy', label:'Notarized By'},
+  {key:'notaryRemarks', label:'Notary Remarks'},
+  {key:'filingArchivingOfficer', label:'Filing & Archiving Officer'},
+  {key:'fileStatus', label:'File Status'},
+  {key:'dateFiled', label:'Date Filed', type:'date'},
+  {key:'filingLocation', label:'Filing Location'},
+  {key:'pulloutRequestedBy', label:'Pullout — Requested By'},
+  {key:'pulloutDocumentType', label:'Pullout — Type of Documents'},
+  {key:'pulloutRequestingDept', label:'Pullout — Requesting Dept/Group'},
+  {key:'pulloutRequestDate', label:'Pullout — Request Date', type:'date'},
+  {key:'pulloutDate', label:'Pullout — Date Pullout', type:'date'},
+  {key:'pulloutReturnedDocs', label:'Pullout — Returned Docs'},
+  {key:'pulloutRemarks', label:'Pullout — Remarks'},
+  {key:'doasPulloutBy', label:'DOAS — Pullout By'},
+  {key:'doasRequestedPulloutDate', label:'DOAS — Requested Date Pullout', type:'date'},
+  {key:'doasStatus', label:'DOAS Status'},
+  {key:'ndoasDateReturned', label:'N-DOAS — Date Returned', type:'date'},
+  {key:'doasReturnBy', label:'DOAS — Return By'},
+  {key:'doasRemarks', label:'DOAS — Remarks'},
+  {key:'archivingAccountsStatus', label:'Archiving — Accounts Status'},
+  {key:'archivingPulloutDate', label:'Archiving — Pullout Date', type:'date'},
+  {key:'archivedDate', label:'Archiving — Archived Date', type:'date'},
+  {key:'archivingLocation', label:'Archiving — Location'},
+  {key:'dateDisposal', label:'Archiving — Date Disposal', type:'date'},
+  {key:'archivingRemarks', label:'Archiving — Remarks'},
+  {key:'boiStatusFiling', label:'BOI Status Entry — BOI Status'},
+  {key:'boiDateSubmitted', label:'BOI Status Entry — Date Submitted', type:'date'},
+  {key:'boiNcpaSubmittedTo', label:'BOI Status Entry — NCPA Submitted To'},
+  {key:'boiEntryRemarks', label:'BOI Status Entry — Remarks'}
+].concat(DOC_CHECKLIST.map(d=>({key:d.key, label:'Document Checklist — '+d.label, type:'bool'})));
+
+function normalizeHeader(s){ return String(s||'').toLowerCase().replace(/[^a-z0-9]/g,''); }
+
+function setFormValue(form, key, val){
+  const el = form.elements[key];
+  if(!el) return;
+  if(el.type === 'checkbox'){
+    el.checked = (val===true || val==='true' || val==='Yes' || val==='yes');
+    return;
+  }
+  const v = val ?? '';
+  if(el.tagName==='SELECT'){
+    if(v && ![...el.options].some(o=>o.value===v)){
+      const opt=document.createElement('option');
+      opt.value=v; opt.textContent=v+' (unrecognized)';
+      el.appendChild(opt);
+    }
+  }
+  el.value = v;
+}
+
+function buildChecklistUI(){
+  const container = document.getElementById('docChecklist');
+  container.innerHTML = DOC_CHECKLIST.map(d=>`
+    <div class="check-item">
+      <input type="checkbox" id="chk-${d.key}" name="${d.key}">
+      <label for="chk-${d.key}">${esc(d.label)}</label>
+    </div>`).join('');
+}
+
+/* ---------- Record storage: paged, so the registry can hold far more than
+   one 5MB key allows. Records are split across pages of PAGE_SIZE each;
+   an index key tracks how many pages exist. Saving only rewrites the
+   page(s) that actually changed, not the whole registry, so a single edit
+   stays fast even with tens of thousands of records on file. ---------- */
+const RECORDS_INDEX_KEY = 'docutrack:records:index';
+const RECORDS_PAGE_PREFIX = 'docutrack:records:page:';
+const PAGE_SIZE = 500;
+let pageOf = {};     // recordId -> page number
+let pageCount = 0;
+let lastPageSize = 0;
+
+/* The storage platform can fail a write by returning null instead of
+   throwing — these wrappers turn that into a real, catchable error so
+   no save can silently do nothing. Every storage call in this app goes
+   through these two functions. */
+async function storageSet(key, value, shared){
+  const result = await window.storage.set(key, value, shared);
+  if(!result) throw new Error('Storage write returned no result for key: ' + key);
+  return result;
+}
+async function storageGet(key, shared){
+  try{
+    return await window.storage.get(key, shared);
+  }catch(e){
+    return null; // treat "not found" / read errors the same: nothing there
+  }
+}
+
+function assignPage(id){
+  let page;
+  if(pageCount>0 && lastPageSize < PAGE_SIZE){
+    page = pageCount - 1;
+    lastPageSize++;
+  } else {
+    page = pageCount;
+    pageCount++;
+    lastPageSize = 1;
+  }
+  pageOf[id] = page;
+  return page;
+}
+
+async function savePages(pageNumbers){
+  const unique = [...new Set(pageNumbers)].filter(p=>p!==undefined && p!==null);
+  try{
+    for(const p of unique){
+      const slice = records.filter(r=> pageOf[r.id]===p);
+      await storageSet(RECORDS_PAGE_PREFIX+p, JSON.stringify(slice), true);
+    }
+    await storageSet(RECORDS_INDEX_KEY, JSON.stringify({pageCount, total:records.length, updatedAt:Date.now()}), true);
+    return true;
+  }catch(e){
+    console.error('Save failed', e);
+    alert('Could not save to the registry — the save was rejected. Please wait a moment and try again; if this keeps happening, the file/dataset may be too large for one save.');
+    return false;
+  }
+}
+
+async function loadRecords(){
+  try{
+    const idxRes = await storageGet(RECORDS_INDEX_KEY, true);
+    if(idxRes && idxRes.value){
+      const idx = JSON.parse(idxRes.value);
+      pageCount = idx.pageCount || 0;
+      let all = [];
+      pageOf = {};
+      for(let p=0;p<pageCount;p++){
+        const pr = await storageGet(RECORDS_PAGE_PREFIX+p, true);
+        const pageRecords = pr && pr.value ? JSON.parse(pr.value) : [];
+        pageRecords.forEach(r=>{ pageOf[r.id]=p; });
+        all = all.concat(pageRecords);
+        if(p===pageCount-1) lastPageSize = pageRecords.length;
+      }
+      records = all;
+    } else {
+      // one-time migration from the earlier single-key format, if present
+      const legacyRes = await storageGet('docutrack:records', true);
+      records = legacyRes && legacyRes.value ? JSON.parse(legacyRes.value) : [];
+      pageOf = {}; pageCount = 0; lastPageSize = 0;
+      if(records.length){
+        const touched = new Set();
+        records.forEach(r=> touched.add(assignPage(r.id)));
+        await savePages([...touched]);
+      }
+    }
+  }catch(e){ records = []; }
+  renderAll();
+}
+function uid(){ return 'r' + Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
+
+function badgeClass(status){
+  const s=(status||'').toLowerCase();
+  if(s==='reserved') return 'b-reserved';
+  if(s==='contracted') return 'b-contracted';
+  if(s==='booked') return 'b-booked';
+  if(['fallout','backout','cancelled'].includes(s)) return 'b-fallout';
+  return 'b-default';
+}
+function scanBadgeClass(status){
+  const s=(status||'').toLowerCase();
+  if(s==='scanned - complete') return 'b-complete';
+  if(s.startsWith('scanned -')||s==='pending scanning') return 'b-pending';
+  if(['fallout','backout','cancelled'].includes(s)) return 'b-fallout';
+  return 'b-default';
+}
+function fileBadgeClass(status){
+  const s=(status||'').toLowerCase();
+  if(s.startsWith('on file')) return 'b-complete';
+  if(s.startsWith('for ')) return 'b-pending';
+  if(s==='archived') return 'b-booked';
+  return 'b-default';
+}
+function esc(v){ return (v===undefined||v===null) ? '' : String(v).replace(/</g,'&lt;'); }
+function escAttr(v){ return (v===undefined||v===null) ? '' : String(v).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;'); }
+function buyerName(r){
+  return [r.lastName, r.firstName].filter(Boolean).join(', ') + (r.middleName? ' '+r.middleName[0]+'.' : '') || '—';
+}
+
+/* Column definitions per tab — drive both the table and the per-column filters */
+const COLUMNS = {
+  filing: [
+    {key:'unitCode', label:'Unit Code', accessor:r=>r.unitCode, cellCls:'mono'},
+    {key:'company', label:'Company', accessor:r=>r.company},
+    {key:'projectName', label:'Project', accessor:r=>r.projectName},
+    {key:'unit', label:'Unit', accessor:r=>r.unit},
+    {key:'buyerName', label:'Buyer Name', accessor:r=>buyerName(r)},
+    {key:'unitStatus', label:'Unit Status', accessor:r=>r.unitStatus, badge:badgeClass},
+    {key:'filingArchivingOfficer', label:'Filing & Archiving Officer', accessor:r=>r.filingArchivingOfficer},
+    {key:'fileStatus', label:'File Status', accessor:r=>r.fileStatus, badge:fileBadgeClass},
+    {key:'dateFiled', label:'Date Filed', accessor:r=>r.dateFiled},
+    {key:'spaStatus', label:'SPA Status', accessor:r=>r.spaStatus},
+    {key:'spaType', label:'SPA Type', accessor:r=>r.spaType},
+    {key:'spaCopies', label:'SPA Copies', accessor:r=>r.spaCopies},
+    {key:'boiStatusFiling', label:'BOI Status', accessor:r=>r.boiStatusFiling}
+  ],
+  scanning: [
+    {key:'unitCode', label:'Unit Code', accessor:r=>r.unitCode, cellCls:'mono'},
+    {key:'company', label:'Company', accessor:r=>r.company},
+    {key:'projectName', label:'Project', accessor:r=>r.projectName},
+    {key:'unit', label:'Unit', accessor:r=>r.unit},
+    {key:'buyerName', label:'Buyer Name', accessor:r=>buyerName(r)},
+    {key:'unitStatus', label:'Unit Status', accessor:r=>r.unitStatus, badge:badgeClass},
+    {key:'docketScanningStatus', label:'Docket Scanning Status', accessor:r=>r.docketScanningStatus, badge:scanBadgeClass},
+    {key:'scanningAO', label:'Scanning AO', accessor:r=>r.scanningAO},
+    {key:'dateReceivedScanning', label:'Date Received', accessor:r=>r.dateReceivedScanning},
+    {key:'dateScanned', label:'Date Scanned', accessor:r=>r.dateScanned},
+    {key:'notaryStatus', label:'Notary Status', accessor:r=>r.notaryStatus},
+    {key:'accountOfficer', label:'Account Officer', accessor:r=>r.accountOfficer},
+    {key:'ncpaNotaryDate', label:'NCPA Notary Date', accessor:r=>r.ncpaNotaryDate},
+    {key:'notarizedBy', label:'Notarized By', accessor:r=>r.notarizedBy}
+  ]
+};
+
+let columnFilters = {filing:{}, scanning:{}};
+
+function switchTab(tab){
+  currentTab = tab;
+  currentPage = 1;
+  document.getElementById('tabBtn-filing').classList.toggle('active', tab==='filing');
+  document.getElementById('tabBtn-scanning').classList.toggle('active', tab==='scanning');
+  closeFilterPopover();
+  renderAll();
+}
+
+function renderAll(){ renderThead(); renderTable(); refreshDatalists(); }
+
+function renderThead(){
+  const cols = COLUMNS[currentTab];
+  const cells = cols.map(c=>{
+    const active = columnFilters[currentTab][c.key] ? ' active' : '';
+    return `<th><div class="th-inner"><span>${esc(c.label)}</span><button class="filter-btn${active}" type="button" onclick="toggleFilterPopover(event,'${c.key}')">▾</button></div></th>`;
+  }).join('') + '<th></th>';
+  document.getElementById('thead').innerHTML = `<tr>${cells}</tr>`;
+  const anyActive = Object.keys(columnFilters[currentTab]).length > 0;
+  document.getElementById('clearFiltersBtn').style.display = anyActive ? '' : 'none';
+}
+
+function passesColumnFilters(r){
+  const cols = COLUMNS[currentTab];
+  const tabFilters = columnFilters[currentTab];
+  return Object.entries(tabFilters).every(([colKey, allowedArr])=>{
+    const col = cols.find(c=>c.key===colKey);
+    if(!col) return true;
+    const raw = col.accessor(r);
+    const val = (raw!==undefined && raw!==null && String(raw).trim()!=='') ? String(raw) : '(Blanks)';
+    return allowedArr.includes(val);
+  });
+}
+
+function renderTable(){
+  const q = (document.getElementById('searchInput').value||'').toLowerCase();
+  const cols = COLUMNS[currentTab];
+  const filtered = records.filter(r=>{
+    const matchesQ = !q || [r.unitCode,r.lastName,r.firstName,r.projectName,r.company].join(' ').toLowerCase().includes(q);
+    return matchesQ && passesColumnFilters(r);
+  }).sort((a,b)=> (b.updatedAt||0) - (a.updatedAt||0));
+
+  document.getElementById('recCount').textContent = records.length + ' record' + (records.length===1?'':'s') + ' on file';
+  document.getElementById('cnt-filing').textContent = records.length;
+  document.getElementById('cnt-scanning').textContent = records.length;
+
+  const tbody = document.getElementById('tbody');
+  const pager = document.getElementById('tablePager');
+  if(filtered.length===0){
+    tbody.innerHTML = `<tr class="empty-row"><td colspan="${cols.length+1}">${records.length===0 ? 'No entries yet. Click "+ New Entry" to add the first record.' : 'No rows match the current search/filters.'}</td></tr>`;
+    pager.innerHTML = '';
+    return;
+  }
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / ROWS_PER_PAGE));
+  if(currentPage > totalPages) currentPage = totalPages;
+  if(currentPage < 1) currentPage = 1;
+  const startIdx = (currentPage-1) * ROWS_PER_PAGE;
+  const pageRows = filtered.slice(startIdx, startIdx + ROWS_PER_PAGE);
+
+  const clip = r => (r.attachmentCount ? `<span class="clip">📎 ${r.attachmentCount}</span>` : '');
+  const codeCounts = {};
+  records.forEach(r=>{ if(r.unitCode){ const k=r.unitCode.trim().toLowerCase(); codeCounts[k]=(codeCounts[k]||0)+1; } });
+  const dupWarn = r => (r.unitCode && codeCounts[r.unitCode.trim().toLowerCase()]>1)
+    ? `<span class="clip" style="background:#FBEAE6;border-color:#EBC3B8;color:var(--red);" title="More than one entry uses this Unit Code">⚠ dup</span>` : '';
+
+  tbody.innerHTML = pageRows.map(r=>{
+    const cells = cols.map(c=>{
+      const v = c.accessor(r);
+      const disp = esc(v) || '—';
+      const inner = c.badge ? `<span class="badge ${c.badge(v)}">${disp}</span>` : disp;
+      const extra = c.key==='unitCode' ? clip(r)+dupWarn(r) : '';
+      return `<td class="${c.cellCls||''}">${inner}${extra}</td>`;
+    }).join('');
+    return `<tr onclick="openModal('${r.id}')">${cells}<td class="row-actions" onclick="event.stopPropagation()"><button onclick="openModal('${r.id}')">Open</button><button onclick="openDocumentsLibrary('${r.id}')">📎 Docs${r.attachmentCount?' ('+r.attachmentCount+')':''}</button></td></tr>`;
+  }).join('');
+
+  const rangeStart = filtered.length ? startIdx+1 : 0;
+  const rangeEnd = Math.min(startIdx+ROWS_PER_PAGE, filtered.length);
+  pager.innerHTML = `
+    <span class="pager-info">Showing ${rangeStart}–${rangeEnd} of ${filtered.length}${filtered.length!==records.length ? ' (filtered from '+records.length+')' : ''}</span>
+    <span class="spacer"></span>
+    <button class="btn secondary small" ${currentPage<=1?'disabled':''} onclick="goToPage(1)">« First</button>
+    <button class="btn secondary small" ${currentPage<=1?'disabled':''} onclick="goToPage(currentPage-1)">‹ Prev</button>
+    <span class="pager-page">Page ${currentPage} of ${totalPages}</span>
+    <button class="btn secondary small" ${currentPage>=totalPages?'disabled':''} onclick="goToPage(currentPage+1)">Next ›</button>
+    <button class="btn secondary small" ${currentPage>=totalPages?'disabled':''} onclick="goToPage(${totalPages})">Last »</button>
+  `;
+}
+function goToPage(p){ currentPage = p; renderTable(); }
+
+/* ---------- Column filter popover (Excel-style) ---------- */
+let fpCol = null, fpAllValues = [], fpSelected = new Set();
+
+function toggleFilterPopover(e, colKey){
+  e.stopPropagation();
+  const pop = document.getElementById('filterPopover');
+  if(pop.classList.contains('show') && fpCol===colKey){ closeFilterPopover(); return; }
+  fpCol = colKey;
+  const col = COLUMNS[currentTab].find(c=>c.key===colKey);
+  const valuesSet = new Set();
+  records.forEach(r=>{
+    const raw = col.accessor(r);
+    valuesSet.add((raw!==undefined && raw!==null && String(raw).trim()!=='') ? String(raw) : '(Blanks)');
+  });
+  fpAllValues = [...valuesSet].sort();
+  const existing = columnFilters[currentTab][colKey];
+  fpSelected = new Set(existing ? existing : fpAllValues);
+  document.querySelector('#filterPopover .fp-search').value = '';
+  renderFilterPopoverList(fpAllValues);
+
+  const btn = e.currentTarget;
+  const rect = btn.getBoundingClientRect();
+  pop.style.top = (rect.bottom + window.scrollY + 4) + 'px';
+  pop.style.left = Math.max(8, rect.left + window.scrollX - 180) + 'px';
+  pop.classList.add('show');
+}
+function renderFilterPopoverList(values){
+  document.getElementById('fpList').innerHTML = values.map(v=>{
+    const id = 'fpv-' + btoa(unescape(encodeURIComponent(v))).replace(/[^a-zA-Z0-9]/g,'');
+    return `<label class="fp-item" for="${id}"><input type="checkbox" id="${id}" data-value="${escAttr(v)}" ${fpSelected.has(v)?'checked':''} onchange="fpToggle(this.dataset.value, this.checked)"> ${esc(v)}</label>`;
+  }).join('');
+}
+function fpToggle(v, checked){ if(checked) fpSelected.add(v); else fpSelected.delete(v); }
+function fpSelectAll(){ fpAllValues.forEach(v=>fpSelected.add(v)); renderFilterPopoverList(currentFpVisible()); }
+function fpClear(){ fpSelected.clear(); renderFilterPopoverList(currentFpVisible()); }
+let fpVisibleValues = null;
+function currentFpVisible(){ return fpVisibleValues || fpAllValues; }
+function filterPopoverSearch(q){
+  const ql = q.toLowerCase();
+  fpVisibleValues = fpAllValues.filter(v=> v.toLowerCase().includes(ql));
+  renderFilterPopoverList(fpVisibleValues);
+}
+function closeFilterPopover(){
+  document.getElementById('filterPopover').classList.remove('show');
+  fpCol = null; fpVisibleValues = null;
+}
+function applyFilterPopover(){
+  if(fpSelected.size === 0 || fpSelected.size === fpAllValues.length){
+    delete columnFilters[currentTab][fpCol];
+  } else {
+    columnFilters[currentTab][fpCol] = [...fpSelected];
+  }
+  currentPage = 1;
+  closeFilterPopover();
+  renderAll();
+}
+function clearColumnFilters(){
+  columnFilters[currentTab] = {};
+  currentPage = 1;
+  renderAll();
+}
+document.addEventListener('click', (e)=>{
+  const pop = document.getElementById('filterPopover');
+  if(pop.classList.contains('show') && !pop.contains(e.target) && !e.target.classList.contains('filter-btn')){
+    closeFilterPopover();
+  }
+});
+
+function refreshDatalists(){
+  DL_FIELDS.forEach(f=>{
+    const vals = new Set((DEFAULT_SUGGESTIONS[f]||[]));
+    records.forEach(r=>{ if(r[f]) vals.add(r[f]); });
+    const dl = document.getElementById('dl-'+f);
+    if(dl) dl.innerHTML = [...vals].sort().map(v=>`<option value="${esc(v)}">`).join('');
+  });
+}
+
+/* ---------- Entry modal ---------- */
+async function openModal(id){
+  const form = document.getElementById('entryForm');
+  form.reset();
+  modalAttachments = [];
+
+  if(id){
+    modalRecordId = id;
+    modalIsNew = false;
+    document.getElementById('modalTitle').textContent = 'Edit Entry — ' + id;
+    const r = records.find(x=>x.id===id);
+    if(r){
+      Object.keys(r).forEach(k=> setFormValue(form, k, r[k]));
+    }
+    await loadAttachments(id);
+  } else {
+    modalRecordId = uid();
+    modalIsNew = true;
+    document.getElementById('modalTitle').textContent = 'New Entry';
+    renderFileList();
+  }
+  document.getElementById('overlay').classList.add('show');
+}
+function closeModal(){
+  document.getElementById('overlay').classList.remove('show');
+  modalRecordId = null;
+}
+
+/* ---------- Attachments (upload + view — no delete) ----------
+   Each file is split into ~4MB text chunks and stored under its own keys,
+   because the underlying storage caps any single value at 5MB. This lets a
+   single scanned file be up to 10MB, with no cap on how many files a unit
+   can have. A small per-record index lists what's attached without needing
+   to load the actual file bytes until someone opens or downloads one. */
+const FILE_INDEX_PREFIX = 'docutrack:filesidx:';
+const FILE_CHUNK_PREFIX = 'docutrack:filechunk:';
+const FILE_CHUNK_TEXT_SIZE = 4 * 1024 * 1024;
+const MAX_FILE_BYTES = 10 * 1024 * 1024;
+
+function fileIdGen(){ return 'f' + Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
+
+async function loadFileIndex(recordId){
+  const res = await storageGet(FILE_INDEX_PREFIX+recordId, true);
+  return res && res.value ? JSON.parse(res.value) : [];
+}
+async function saveFileIndex(recordId, index){
+  await storageSet(FILE_INDEX_PREFIX+recordId, JSON.stringify(index), true);
+}
+async function storeFileChunks(recordId, fileId, base64Payload){
+  const chunkCount = Math.max(1, Math.ceil(base64Payload.length / FILE_CHUNK_TEXT_SIZE));
+  for(let i=0;i<chunkCount;i++){
+    const chunk = base64Payload.slice(i*FILE_CHUNK_TEXT_SIZE, (i+1)*FILE_CHUNK_TEXT_SIZE);
+    await storageSet(FILE_CHUNK_PREFIX+recordId+':'+fileId+':'+i, chunk, true);
+  }
+  return chunkCount;
+}
+async function loadFileData(recordId, meta){
+  if(meta.legacy) return meta.data; // old single-key format already has the full data URL
+  let payload = '';
+  for(let i=0;i<meta.chunkCount;i++){
+    const res = await storageGet(FILE_CHUNK_PREFIX+recordId+':'+meta.fileId+':'+i, true);
+    if(!res || res.value===undefined || res.value===null) throw new Error('Missing chunk '+i+' for file '+meta.name);
+    payload += res.value;
+  }
+  return `data:${meta.type||'application/octet-stream'};base64,${payload}`;
+}
+
+async function loadAttachments(id){
+  let idx = await loadFileIndex(id);
+  if(!idx || idx.length===0){
+    // fall back to the earlier single-key format, so older uploads still show up
+    const res = await storageGet('docutrack:files:'+id, true);
+    const legacy = res && res.value ? JSON.parse(res.value) : [];
+    idx = legacy.map(a=>({...a, legacy:true}));
+  }
+  modalAttachments = idx;
+  renderFileList();
+}
+function onFileInputChange(e){ addFiles(e.target.files); e.target.value=''; }
+(function initDropzone(){
+  const dz = document.getElementById('dropzone');
+  dz.addEventListener('dragover', e=>{ e.preventDefault(); dz.classList.add('drag'); });
+  dz.addEventListener('dragleave', ()=> dz.classList.remove('drag'));
+  dz.addEventListener('drop', e=>{ e.preventDefault(); dz.classList.remove('drag'); addFiles(e.dataTransfer.files); });
+})();
+
+function readAsDataURL(file){
+  return new Promise((resolve,reject)=>{
+    const r = new FileReader();
+    r.onload = ()=> resolve(r.result);
+    r.onerror = ()=> reject(r.error);
+    r.readAsDataURL(file);
+  });
+}
+
+async function addFiles(fileList){
+  const files = Array.from(fileList||[]);
+  if(files.length===0) return;
+
+  if(modalIsNew){
+    const unitCodeVal = document.getElementById('entryForm').elements['unitCode'].value.trim();
+    if(!unitCodeVal){
+      alert('Please enter a Unit Code first, so the document can be linked to this entry — then upload again.');
+      return;
+    }
+  }
+
+  const list = document.getElementById('fileList');
+  let uploadedAny = false;
+  for(const f of files){
+    if(f.size > MAX_FILE_BYTES){
+      alert(`"${f.name}" is ${fmtSize(f.size)}, which is over the 10MB per-file limit. Please upload a smaller file.`);
+      continue;
+    }
+    const tempRow = document.createElement('div');
+    tempRow.className = 'file-row';
+    tempRow.innerHTML = `<span class="fname">Uploading "${esc(f.name)}"…</span>`;
+    list.appendChild(tempRow);
+    try{
+      const dataUrl = await readAsDataURL(f);
+      const base64Payload = dataUrl.slice(dataUrl.indexOf(',')+1);
+      const fileId = fileIdGen();
+      const chunkCount = await storeFileChunks(modalRecordId, fileId, base64Payload);
+      modalAttachments.push({fileId, name:f.name, type:f.type, size:f.size, chunkCount, uploadedAt:Date.now()});
+      uploadedAny = true;
+    }catch(err){
+      alert(`Could not upload "${f.name}". Please check your connection and try again.`);
+    }
+    tempRow.remove();
+  }
+
+  if(uploadedAny){
+    try{
+      await saveFileIndex(modalRecordId, modalAttachments);
+    }catch(err){
+      alert('The file uploaded, but saving the document list failed — please close and reopen this entry, then try uploading again to be safe.');
+    }
+
+    // If this is a brand-new entry that hasn't been saved yet, register a minimal
+    // record right now so the upload is never left unattached to anything visible.
+    if(modalIsNew && !records.find(r=>r.id===modalRecordId)){
+      const unitCodeVal = document.getElementById('entryForm').elements['unitCode'].value.trim();
+      records.push({id:modalRecordId, unitCode:unitCodeVal, attachmentCount:0, createdAt:Date.now(), updatedAt:Date.now()});
+      assignPage(modalRecordId);
+      modalIsNew = false;
+      document.getElementById('modalTitle').textContent = 'Edit Entry — ' + modalRecordId;
+    }
+
+    const idx = records.findIndex(r=>r.id===modalRecordId);
+    if(idx>-1){
+      records[idx].attachmentCount = modalAttachments.length;
+      await savePages([pageOf[modalRecordId]]);
+      renderTable();
+    }
+  }
+  renderFileList();
+}
+
+function fmtSize(bytes){
+  if(!bytes) return '0 KB';
+  if(bytes < 1024*1024) return Math.round(bytes/1024) + ' KB';
+  return (bytes/(1024*1024)).toFixed(1) + ' MB';
+}
+
+function renderFileList(){
+  const list = document.getElementById('fileList');
+  if(modalAttachments.length===0){
+    list.innerHTML = '';
+  } else {
+    list.innerHTML = modalAttachments.map((a,i)=>`
+      <div class="file-row">
+        <span class="fname">${esc(a.name)}</span>
+        <span class="fsize">${fmtSize(a.size)}</span>
+        <a href="javascript:void(0)" onclick="viewAttachment(${i})">View</a>
+        <a href="javascript:void(0)" onclick="downloadAttachment(${i})">Download</a>
+        <span class="locked">🔒 on file</span>
+      </div>`).join('');
+  }
+  const total = modalAttachments.reduce((s,a)=>s+(a.size||0),0);
+  document.getElementById('storageMeter').textContent =
+    modalAttachments.length ? `${modalAttachments.length} file(s) attached · ${fmtSize(total)} total · up to 10MB per file, no limit on the number of files` : '';
+}
+
+async function viewAttachment(i){
+  const meta = modalAttachments[i];
+  if(!meta) return;
+  const box = document.getElementById('previewBox');
+  box.innerHTML = `<div class="pv-name">Loading "${esc(meta.name)}"…</div>`;
+  document.getElementById('previewOverlay').classList.add('show');
+  try{
+    const dataUrl = await loadFileData(modalRecordId, meta);
+    renderPreviewBox(dataUrl, meta, ()=>`downloadAttachment(${i})`);
+  }catch(e){
+    box.innerHTML = `<div class="pv-name">Could not load "${esc(meta.name)}".</div><button class="pv-close" onclick="closePreview()">Close</button>`;
+  }
+}
+async function downloadAttachment(i){
+  const meta = modalAttachments[i];
+  if(!meta) return;
+  try{
+    const dataUrl = await loadFileData(modalRecordId, meta);
+    triggerDownload(dataUrl, meta.name);
+  }catch(e){ alert('Could not download this file.'); }
+}
+function triggerDownload(dataUrl, filename){
+  const a = document.createElement('a');
+  a.href = dataUrl; a.download = filename;
+  document.body.appendChild(a); a.click(); a.remove();
+}
+function renderPreviewBox(dataUrl, meta, downloadCallAttr){
+  const box = document.getElementById('previewBox');
+  if(meta.type && meta.type.startsWith('image/')){
+    box.innerHTML = `<img src="${dataUrl}" alt="${escAttr(meta.name)}"><div class="pv-name">${esc(meta.name)}</div><button class="pv-close" onclick="closePreview()">Close</button>`;
+  } else if(meta.type === 'application/pdf'){
+    box.innerHTML = `<iframe src="${dataUrl}"></iframe><div class="pv-name">${esc(meta.name)}</div><button class="pv-close" onclick="closePreview()">Close</button>`;
+  } else {
+    box.innerHTML = `<div class="pv-name">Preview isn't available for this file type.<br>Use Download to open "${esc(meta.name)}".</div><button class="pv-close" onclick="closePreview()">Close</button>`;
+  }
+}
+function closePreview(){
+  document.getElementById('previewOverlay').classList.remove('show');
+  document.getElementById('previewBox').innerHTML = '';
+}
+
+/* ---------- Documents Library: browse uploaded files, all units, one buyer, or a group of buyers who share a Unit Code ---------- */
+let libraryFiles = [];
+async function openDocumentsLibrary(filterIds){
+  document.getElementById('libraryOverlay').classList.add('show');
+  const body = document.getElementById('libraryBody');
+  const titleEl = document.getElementById('libraryTitle');
+  body.innerHTML = '<p class="req-note">Loading documents…</p>';
+
+  const idList = filterIds ? (Array.isArray(filterIds) ? filterIds : [filterIds]) : null;
+  const scope = idList ? records.filter(r=> idList.includes(r.id)) : records;
+  const isSingle = idList && idList.length===1;
+  const scopedRecord = isSingle ? records.find(r=>r.id===idList[0]) : null;
+
+  if(isSingle && scopedRecord){
+    titleEl.textContent = `Uploaded Documents — ${scopedRecord.unitCode || 'Unit'}${buyerName(scopedRecord)!=='—' ? ' · '+buyerName(scopedRecord) : ''}`;
+  } else if(idList){
+    const codes = [...new Set(scope.map(r=>r.unitCode).filter(Boolean))];
+    titleEl.textContent = `Uploaded Documents — ${codes.join(', ')} (${scope.length} entries)`;
+  } else {
+    titleEl.textContent = 'Uploaded Documents — All Buyers';
+  }
+
+  const all = [];
+  for(const r of scope){
+    // For the all-buyers view we skip records with no attachments as a performance
+    // shortcut. For a scoped view (one buyer, or a shared-code group) we always
+    // check directly — a stale or missing counter should never hide a real file.
+    if(!idList && !r.attachmentCount) continue;
+    let idx = await loadFileIndex(r.id);
+    if(!idx || idx.length===0){
+      const res = await storageGet('docutrack:files:'+r.id, true);
+      const legacy = res && res.value ? JSON.parse(res.value) : [];
+      idx = legacy.map(a=>({...a, legacy:true}));
+    }
+    idx.forEach(meta=> all.push({...meta, recordId:r.id, unitCode:r.unitCode, buyer:buyerName(r)}));
+    if((r.attachmentCount||0) !== idx.length){
+      r.attachmentCount = idx.length;
+      await savePages([pageOf[r.id]]);
+    }
+  }
+  all.sort((a,b)=> (b.uploadedAt||0)-(a.uploadedAt||0));
+  libraryFiles = all;
+  if(all.length===0){
+    let extra = '';
+    if(isSingle && scopedRecord && scopedRecord.unitCode){
+      const dupes = records.filter(r=> r.id!==scopedRecord.id && r.unitCode && r.unitCode.trim().toLowerCase()===scopedRecord.unitCode.trim().toLowerCase());
+      if(dupes.length>0){
+        const allIds = JSON.stringify([scopedRecord.id, ...dupes.map(d=>d.id)]);
+        extra = `<div style="margin-top:12px;padding:10px 12px;background:var(--gold-soft);border:1px solid var(--gold);border-radius:var(--radius);font-size:12.5px;">
+          ⚠ Found ${dupes.length} other ${dupes.length===1?'entry':'entries'} also using Unit Code <strong>${esc(scopedRecord.unitCode)}</strong>
+          — this usually means the unit changed hands (fallout / rebooked) and each buyer has their own separate entry and their own separate documents.
+          A document may have been uploaded under one of the others instead of this one.
+          <div style="margin:10px 0;">
+            <button class="btn gold small" onclick='closeDocumentsLibrary(); openDocumentsLibrary(${allIds})'>Check all ${dupes.length+1} entries at once</button>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:6px;">
+            ${dupes.map(d=>`
+              <div style="display:flex;align-items:center;gap:10px;background:var(--white);border:1px solid var(--line);border-radius:var(--radius);padding:6px 10px;">
+                <span style="flex:1;">${esc(d.unitCode)} · ${esc(buyerName(d))}</span>
+                <button class="btn secondary small" onclick="closeDocumentsLibrary(); openDocumentsLibrary('${d.id}')">View</button>
+                <button class="btn secondary small" onclick="closeDocumentsLibrary(); openModal('${d.id}')">Open Entry</button>
+              </div>`).join('')}
+          </div>
+        </div>`;
+      }
+    }
+    body.innerHTML = (idList
+      ? '<p class="req-note">No documents uploaded yet for this buyer. Open the entry and use the Attachments section to upload scanned files.</p>'
+      : '<p class="req-note">No documents uploaded yet. Open any entry and use the Attachments section to upload scanned files.</p>') + extra;
+    renderTable();
+    return;
+  }
+  renderTable();
+  const showUnitCol = !isSingle;
+  body.innerHTML = `<div class="table-wrap" style="max-height:56vh;"><table>
+    <thead><tr>${showUnitCol?'<th>Unit Code</th><th>Buyer</th>':''}<th>File</th><th>Size</th><th>Uploaded</th><th></th></tr></thead>
+    <tbody>${all.map((f,i)=>`
+      <tr>
+        ${showUnitCol?`<td class="mono">${esc(f.unitCode)}</td><td>${esc(f.buyer)}</td>`:''}
+        <td>${esc(f.name)}</td>
+        <td>${fmtSize(f.size)}</td>
+        <td>${f.uploadedAt ? new Date(f.uploadedAt).toLocaleDateString() : '—'}</td>
+        <td class="row-actions">
+          <button onclick="libraryView(${i})">View</button>
+          <button onclick="libraryDownload(${i})">Download</button>
+          <button onclick="closeDocumentsLibrary(); openModal('${f.recordId}')">Open Entry</button>
+        </td>
+      </tr>`).join('')}
+    </tbody></table></div>`;
+}
+function closeDocumentsLibrary(){
+  document.getElementById('libraryOverlay').classList.remove('show');
+}
+async function libraryView(i){
+  const f = libraryFiles[i];
+  if(!f) return;
+  const box = document.getElementById('previewBox');
+  box.innerHTML = `<div class="pv-name">Loading "${esc(f.name)}"…</div>`;
+  document.getElementById('previewOverlay').classList.add('show');
+  try{
+    const dataUrl = await loadFileData(f.recordId, f);
+    renderPreviewBox(dataUrl, f);
+  }catch(e){
+    box.innerHTML = `<div class="pv-name">Could not load "${esc(f.name)}".</div><button class="pv-close" onclick="closePreview()">Close</button>`;
+  }
+}
+async function libraryDownload(i){
+  const f = libraryFiles[i];
+  if(!f) return;
+  try{
+    const dataUrl = await loadFileData(f.recordId, f);
+    triggerDownload(dataUrl, f.name);
+  }catch(e){ alert('Could not download this file.'); }
+}
+
+/* ---------- Save entry (no delete function exists) ---------- */
+async function saveEntry(e){
+  e.preventDefault();
+  const form = document.getElementById('entryForm');
+  if(!form.elements['unitCode'].value.trim()){
+    alert('Unit Code is required.');
+    form.elements['unitCode'].focus();
+    return;
+  }
+  const data = {};
+  new FormData(form).forEach((v,k)=>{ data[k]=v; });
+  DOC_CHECKLIST.forEach(d=>{ data[d.key] = !!form.elements[d.key].checked; });
+  data.attachmentCount = modalAttachments.length;
+
+  let dirtyPage;
+  if(!modalIsNew){
+    const idx = records.findIndex(r=>r.id===modalRecordId);
+    records[idx] = {...records[idx], ...data, updatedAt: Date.now()};
+    dirtyPage = pageOf[modalRecordId];
+  } else {
+    records.push({id:modalRecordId, ...data, createdAt:Date.now(), updatedAt:Date.now()});
+    dirtyPage = assignPage(modalRecordId);
+  }
+  await savePages([dirtyPage]);
+  renderAll();
+  document.getElementById('overlay').classList.remove('show');
+  modalRecordId = null;
+}
+
+function exportXLSX(){
+  if(records.length===0){ alert('No records to export yet.'); return; }
+  const cols = FIELD_DEFS.map(f=>f.key);
+  const data = records.map(r=>{
+    const row = {};
+    FIELD_DEFS.forEach(f=>{
+      let v = r[f.key];
+      if(f.type==='bool') v = v ? 'Yes' : '';
+      row[f.label] = v ?? '';
+    });
+    return row;
+  });
+  const ws = XLSX.utils.json_to_sheet(data, {header: FIELD_DEFS.map(f=>f.label)});
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'DocuTrack Records');
+  XLSX.writeFile(wb, 'docutrack_records.xlsx');
+}
+
+function exportCSV(){
+  if(records.length===0){ alert('No records to export yet.'); return; }
+  const cols = Object.keys(records[0]).filter(k=>!['id','createdAt','updatedAt','attachmentCount'].includes(k));
+  const header = cols.join(',');
+  const rows = records.map(r=> cols.map(c=>{
+    const v = (r[c]??'').toString().replace(/"/g,'""');
+    return `"${v}"`;
+  }).join(','));
+  const csv = [header, ...rows].join('\n');
+  const blob = new Blob([csv], {type:'text/csv'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'docutrack_records.csv';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+/* ================= Excel / CSV Import ================= */
+let importHeaders = [];
+let importRows = [];
+
+function openImportModal(){
+  importHeaders = []; importRows = [];
+  document.getElementById('importFileInput').value = '';
+  document.getElementById('importStep1').classList.add('active');
+  document.getElementById('importStep2').classList.remove('active');
+  document.getElementById('importBackBtn').style.display = 'none';
+  document.getElementById('importRunBtn').style.display = 'none';
+  document.getElementById('importOverlay').classList.add('show');
+}
+function closeImportModal(){
+  document.getElementById('importOverlay').classList.remove('show');
+}
+function importBackToStep1(){
+  document.getElementById('importStep1').classList.add('active');
+  document.getElementById('importStep2').classList.remove('active');
+  document.getElementById('importBackBtn').style.display = 'none';
+  document.getElementById('importRunBtn').style.display = 'none';
+}
+
+(function initImportDropzone(){
+  const dz = document.getElementById('importDrop');
+  dz.addEventListener('dragover', e=>{ e.preventDefault(); dz.classList.add('drag'); });
+  dz.addEventListener('dragleave', ()=> dz.classList.remove('drag'));
+  dz.addEventListener('drop', e=>{
+    e.preventDefault(); dz.classList.remove('drag');
+    if(e.dataTransfer.files && e.dataTransfer.files[0]) parseImportFile(e.dataTransfer.files[0]);
+  });
+})();
+
+function onImportFileChange(e){
+  if(e.target.files && e.target.files[0]) parseImportFile(e.target.files[0]);
+}
+
+async function parseImportFile(file){
+  try{
+    const data = await file.arrayBuffer();
+    const wb = XLSX.read(data, {type:'array', cellDates:true});
+    const wsName = wb.SheetNames[0];
+    const ws = wb.Sheets[wsName];
+    const rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
+    if(!rows || rows.length < 1){ alert('That file appears to be empty.'); return; }
+    importHeaders = rows[0].map(h=>String(h||'').trim());
+    importRows = rows.slice(1).filter(r=> r.some(c=> String(c).trim()!==''));
+    document.getElementById('importFileName').textContent = file.name;
+    document.getElementById('importRowCount').textContent = importRows.length;
+    buildMappingUI();
+    document.getElementById('importStep1').classList.remove('active');
+    document.getElementById('importStep2').classList.add('active');
+    document.getElementById('importBackBtn').style.display = '';
+    document.getElementById('importRunBtn').style.display = '';
+  }catch(err){
+    console.error(err);
+    alert('Could not read that file. Please make sure it is a valid .xlsx, .xls, or .csv file.');
+  }
+}
+
+function guessField(header){
+  const nh = normalizeHeader(header);
+  if(!nh) return '';
+  let exact = FIELD_DEFS.find(f=> normalizeHeader(f.label)===nh || normalizeHeader(f.key)===nh);
+  if(exact) return exact.key;
+  let partial = FIELD_DEFS.find(f=> nh.includes(normalizeHeader(f.key)) || normalizeHeader(f.key).includes(nh));
+  return partial ? partial.key : '';
+}
+
+function buildMappingUI(){
+  const usedKeys = new Set();
+  const body = document.getElementById('mapTableBody');
+  body.innerHTML = importHeaders.map((h,idx)=>{
+    let guess = guessField(h);
+    if(guess && usedKeys.has(guess)) guess = '';
+    if(guess) usedKeys.add(guess);
+    const options = ['<option value="">Skip this column</option>']
+      .concat(FIELD_DEFS.map(f=>`<option value="${f.key}" ${f.key===guess?'selected':''}>${esc(f.label)}</option>`));
+    return `<tr>
+      <td class="col-header">${esc(h) || '(blank header, column '+(idx+1)+')'}</td>
+      <td><select class="map-select ${guess?'mapped':''}" data-idx="${idx}" onchange="onMapChange(this)">${options.join('')}</select></td>
+    </tr>`;
+  }).join('');
+  renderImportPreview();
+}
+
+function onMapChange(sel){
+  sel.classList.toggle('mapped', !!sel.value);
+  renderImportPreview();
+}
+
+function currentMapping(){
+  const mapping = {};
+  document.querySelectorAll('.map-select').forEach(sel=>{
+    const idx = parseInt(sel.dataset.idx,10);
+    if(sel.value) mapping[idx]=sel.value;
+  });
+  return mapping;
+}
+
+function renderImportPreview(){
+  const mapping = currentMapping();
+  const cols = Object.entries(mapping);
+  const table = document.getElementById('previewTable');
+  if(cols.length===0){ table.innerHTML=''; return; }
+  const headRow = '<tr>' + cols.map(([idx,key])=>{
+    const fd = FIELD_DEFS.find(f=>f.key===key);
+    return `<th>${esc(fd?fd.label:key)}</th>`;
+  }).join('') + '</tr>';
+  const bodyRows = importRows.slice(0,5).map(row=>{
+    return '<tr>' + cols.map(([idx])=> `<td>${esc(row[idx])}</td>`).join('') + '</tr>';
+  }).join('');
+  table.innerHTML = `<thead>${headRow}</thead><tbody>${bodyRows}</tbody>`;
+}
+
+function coerceValue(fieldDef, raw){
+  if(raw===undefined||raw===null) return '';
+  if(fieldDef && fieldDef.type==='date'){
+    if(raw instanceof Date && !isNaN(raw)) return raw.toISOString().slice(0,10);
+    const s = String(raw).trim();
+    if(!s) return '';
+    const d2 = new Date(s);
+    if(!isNaN(d2)) return d2.toISOString().slice(0,10);
+    return s;
+  }
+  if(fieldDef && fieldDef.type==='bool'){
+    const s = String(raw).trim().toLowerCase();
+    return ['yes','y','true','1','x','received','complete'].includes(s);
+  }
+  return String(raw).trim();
+}
+
+async function runImport(){
+  const mapping = currentMapping();
+  if(Object.keys(mapping).length===0){ alert('Map at least one column before importing.'); return; }
+  const updateExisting = document.getElementById('updateExistingChk').checked;
+  const runBtn = document.getElementById('importRunBtn');
+  const origLabel = runBtn.textContent;
+  runBtn.disabled = true;
+  runBtn.textContent = `Importing 0 / ${importRows.length}…`;
+
+  const existingByCode = new Map();
+  if(updateExisting){
+    records.forEach(r=>{ if(r.unitCode) existingByCode.set(String(r.unitCode).trim().toLowerCase(), r); });
+  }
+  const fdByKey = new Map(FIELD_DEFS.map(f=>[f.key,f]));
+
+  let created=0, updated=0, skipped=0;
+  const dirtyPages = new Set();
+  const mapEntries = Object.entries(mapping);
+
+  for(let i=0;i<importRows.length;i++){
+    const row = importRows[i];
+    const rec = {};
+    mapEntries.forEach(([idx,key])=>{
+      rec[key] = coerceValue(fdByKey.get(key), row[idx]);
+    });
+    if(!rec.unitCode || !String(rec.unitCode).trim()){ skipped++; continue; }
+    rec.unitCode = String(rec.unitCode).trim();
+    const codeKey = rec.unitCode.toLowerCase();
+    const existing = updateExisting ? existingByCode.get(codeKey) : null;
+    if(existing){
+      Object.assign(existing, rec, {updatedAt:Date.now()});
+      dirtyPages.add(pageOf[existing.id]);
+      updated++;
+    } else {
+      const newId = uid();
+      const newRec = {id:newId, ...rec, createdAt:Date.now(), updatedAt:Date.now()};
+      records.push(newRec);
+      dirtyPages.add(assignPage(newId));
+      if(updateExisting) existingByCode.set(codeKey, newRec);
+      created++;
+    }
+    if(i % 500 === 0){
+      runBtn.textContent = `Importing ${i} / ${importRows.length}…`;
+      await new Promise(r=>setTimeout(r,0)); // yield so the UI can repaint
+    }
+  }
+
+  runBtn.textContent = `Saving ${dirtyPages.size} page(s)…`;
+  await new Promise(r=>setTimeout(r,0));
+  await savePages([...dirtyPages]);
+
+  runBtn.disabled = false;
+  runBtn.textContent = origLabel;
+  renderAll();
+  alert(`Import complete: ${created} new record(s) created, ${updated} updated, ${skipped} skipped (missing Unit Code).`);
+  closeImportModal();
+}
+
+function downloadTemplate(){
+  const header = FIELD_DEFS.map(f=>f.label).join(',');
+  const blob = new Blob([header + '\n'], {type:'text/csv'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'docutrack_import_template.csv';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+document.getElementById('overlay').addEventListener('click', (e)=>{ if(e.target.id==='overlay') closeModal(); });
+document.getElementById('importOverlay').addEventListener('click', (e)=>{ if(e.target.id==='importOverlay') closeImportModal(); });
+document.getElementById('libraryOverlay').addEventListener('click', (e)=>{ if(e.target.id==='libraryOverlay') closeDocumentsLibrary(); });
+document.addEventListener('keydown',(e)=>{
+  if(e.key==='Escape'){
+    if(document.getElementById('previewOverlay').classList.contains('show')) closePreview();
+    else if(document.getElementById('importOverlay').classList.contains('show')) closeImportModal();
+    else if(document.getElementById('libraryOverlay').classList.contains('show')) closeDocumentsLibrary();
+    else if(document.getElementById('overlay').classList.contains('show')) closeModal();
+  }
+});
+
+/* ---------- Window controls: minimize / maximize / resize ---------- */
+let isMinimized = false;
+function toggleMinimize(){
+  isMinimized = !isMinimized;
+  document.getElementById('appBody').style.display = isMinimized ? 'none' : '';
+  const btn = document.getElementById('minimizeBtn');
+  btn.textContent = isMinimized ? '▢' : '─';
+  btn.title = isMinimized ? 'Restore' : 'Minimize';
+}
+function toggleMaximize(){
+  const root = document.getElementById('appRoot');
+  const btn = document.getElementById('maximizeBtn');
+  const isMax = root.classList.toggle('maximized');
+  btn.textContent = isMax ? '🗗' : '⛶';
+  btn.title = isMax ? 'Restore' : 'Maximize';
+}
+
+(function initResizeHandle(){
+  const handle = document.getElementById('resizeHandle');
+  const wrap = document.getElementById('tableWrap');
+  const MIN_H = 180, MAX_H = 1400;
+  function startDrag(startY, startH){
+    function onMove(clientY){
+      const newH = Math.max(MIN_H, Math.min(MAX_H, startH + (clientY - startY)));
+      wrap.style.maxHeight = newH + 'px';
+    }
+    function onMouseMove(e){ onMove(e.clientY); }
+    function onMouseUp(){
+      document.removeEventListener('mousemove', onMouseMove);
+      document.removeEventListener('mouseup', onMouseUp);
+      document.body.style.userSelect = '';
+    }
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup', onMouseUp);
+    document.body.style.userSelect = 'none';
+  }
+  handle.addEventListener('mousedown', e=>{
+    e.preventDefault();
+    startDrag(e.clientY, wrap.offsetHeight);
+  });
+  handle.addEventListener('touchstart', e=>{
+    const t = e.touches[0];
+    const startY = t.clientY, startH = wrap.offsetHeight;
+    const MIN_H2 = 180, MAX_H2 = 1400;
+    function onTouchMove(e){
+      const t2 = e.touches[0];
+      const newH = Math.max(MIN_H2, Math.min(MAX_H2, startH + (t2.clientY - startY)));
+      wrap.style.maxHeight = newH + 'px';
+    }
+    function onTouchEnd(){
+      document.removeEventListener('touchmove', onTouchMove);
+      document.removeEventListener('touchend', onTouchEnd);
+    }
+    document.addEventListener('touchmove', onTouchMove, {passive:true});
+    document.addEventListener('touchend', onTouchEnd);
+  }, {passive:true});
+})();
+
+buildChecklistUI();
+loadRecords();
+</script>
+</body>
+</html>
