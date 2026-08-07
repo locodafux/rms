@@ -1,12 +1,19 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 from typing import Annotated, Any
 
 import email_validator
-from pydantic import BaseModel, ConfigDict, EmailStr, Field as PField, StringConstraints
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    EmailStr,
+    Field as PField,
+    StringConstraints,
+    field_validator,
+)
 
-from app.fields import Role
+from app.fields import GEO, Role
 
 # Staff accounts live on the internal @records.local domain, which email-validator
 # rejects by default as a special-use TLD. Everything else stays validated.
@@ -42,11 +49,21 @@ class UserOut(BaseModel):
     is_active: bool
     is_superuser: bool
     created_at: datetime
+    geos: list[str] = []
 
 
 class UserUpdate(BaseModel):
     role: Role | None = None
     is_active: bool | None = None
+    geos: list[str] | None = None
+
+    @field_validator("geos")
+    @classmethod
+    def _known_geos(cls, v: list[str] | None) -> list[str] | None:
+        unknown = sorted(set(v or ()) - set(GEO))
+        if unknown:
+            raise ValueError(f"Unknown work area(s): {', '.join(unknown)}")
+        return sorted(set(v)) if v is not None else None
 
 
 class OnlineUser(BaseModel):
@@ -110,6 +127,9 @@ class RecordOut(BaseModel):
     updated_at: datetime
     attachments: list[AttachmentOut] = []
     archive_countdown_days: int | None = None
+    # True when the caller is getting a reduced column set: this record hasn't
+    # reached their section yet, so a missing key may be hidden rather than empty.
+    restricted: bool = False
 
 
 class RecordPage(BaseModel):
@@ -128,6 +148,30 @@ class AuditOut(BaseModel):
     new_value: str | None
     changed_by: int | None
     changed_at: datetime
+
+
+class RecordEventOut(BaseModel):
+    """One filing/pullout/scanning event, read-scoped like the record itself."""
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    kind: str
+    event_date: date | None
+    data: dict[str, Any]
+    source_job_id: int | None
+
+
+class HistoryItem(RecordEventOut):
+    """A record event on the cross-record History page; carries its unit code so
+    the page needs no record lookup."""
+    record_id: int
+    unit_code: str
+
+
+class HistoryPage(BaseModel):
+    items: list[HistoryItem]
+    total: int
+    page: int
+    page_size: int
 
 
 # --- Import / Export --------------------------------------------------------
@@ -150,6 +194,14 @@ class ImportJobOut(BaseModel):
     updated: int
     errors: list[Any]
     created_at: datetime
+
+
+class ImportFileOut(ImportJobOut):
+    """A row in the Files tab. Uploader name/role are denormalized because
+    non-admins may not list users."""
+    uploaded_by: str | None = None
+    uploaded_by_role: str | None = None
+    file_available: bool = False
 
 
 class ExportJobOut(BaseModel):

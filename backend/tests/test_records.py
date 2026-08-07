@@ -64,7 +64,9 @@ def test_concurrent_sections_do_not_clobber(client):
         json={"data": full_section(client, notary) | {"notary_status": "Notarized"}},
     )
     assert r2.status_code == 200, r2.text
-    final = r2.json()["data"]
+    # Read back as admin: notary's own response only carries notary-visible columns.
+    admin = token_for(client, "admin")
+    final = client.get(f"/api/records/{rec['id']}", headers=auth(admin)).json()["data"]
     assert final["docket_scanning_status"] == "scanned - complete"
     assert final["notary_status"] == "Notarized"
 

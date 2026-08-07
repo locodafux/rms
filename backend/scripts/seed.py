@@ -16,18 +16,26 @@ from app.rbac import default_permission_rows
 from app.security import hash_password
 
 
-def seed_permissions(db) -> int:
-    existing = {
-        (r.role, r.field_name)
-        for r in db.execute(select(RoleFieldPermission)).scalars().all()
-    }
-    added = 0
-    for role, field_name in default_permission_rows():
-        if (role, field_name) not in existing:
-            db.add(RoleFieldPermission(role=role, field_name=field_name))
-            added += 1
+def seed_permissions(db) -> tuple[int, int]:
+    """Reconcile role_field_permissions with the registry defaults.
+
+    Stale rows are deleted, not just missing ones added: when a field changes
+    owner in fields.py, an insert-only seed would leave the old role still able
+    to write it. Nothing but this script writes the table, so there are no
+    hand-made rows to preserve.
+    """
+    rows = db.execute(select(RoleFieldPermission)).scalars().all()
+    existing = {(r.role, r.field_name): r for r in rows}
+    wanted = set(default_permission_rows())
+    added = removed = 0
+    for pair in wanted - set(existing):
+        db.add(RoleFieldPermission(role=pair[0], field_name=pair[1]))
+        added += 1
+    for pair in set(existing) - wanted:
+        db.delete(existing[pair])
+        removed += 1
     db.commit()
-    return added
+    return added, removed
 
 
 def seed_admin(db) -> str:
@@ -52,9 +60,9 @@ def main() -> None:
     Base.metadata.create_all(bind=engine)
     db = SessionLocal()
     try:
-        n = seed_permissions(db)
+        added, removed = seed_permissions(db)
         msg = seed_admin(db)
-        print(f"Seeded {n} role-field permission rows.")
+        print(f"Role-field permissions: +{added} / -{removed}.")
         print(msg)
     finally:
         db.close()

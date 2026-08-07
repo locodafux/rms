@@ -8,28 +8,48 @@ from app.audit import apply_changes
 from app.database import get_db
 from app.deps import current_role, get_current_user
 from app.fields import ALL_KEYS, Role
-from app.models import AuditLog, Record, User
+from app.models import AuditLog, Record, RecordEvent, User
 from app.rbac import (
     assert_can_archive,
     assert_can_create,
     assert_fields_allowed,
     assert_own_section_complete,
+    visible_fields,
 )
-from app.schemas import AuditOut, RecordCreate, RecordOut, RecordPage, RecordPatch
+from app.schemas import (
+    AuditOut,
+    RecordCreate,
+    RecordEventOut,
+    RecordOut,
+    RecordPage,
+    RecordPatch,
+)
 from app.validation import validate_values
 
 router = APIRouter(prefix="/api/records", tags=["records"])
 
 
-def _out(record: Record) -> RecordOut:
-    return RecordOut.model_validate(record)
+def _out(record: Record, role: Role) -> RecordOut:
+    """Serialize a record with the columns this role may not read stripped out."""
+    out = RecordOut.model_validate(record)
+    vis = visible_fields(role, record.data)
+    out.data = {k: v for k, v in out.data.items() if k in vis}
+    out.restricted = vis != ALL_KEYS
+    return out
 
 
-def _matches_filters(record: Record, search: str | None, filters: dict[str, str]) -> bool:
+def _matches_filters(
+    record: Record, search: str | None, filters: dict[str, str], role: Role
+) -> bool:
+    # Per record: a record this role has worked on is fully readable, a new one
+    # is not. Matching on a value the caller can't read would leak it by probing.
+    visible = visible_fields(role, record.data)
     if search:
         needle = search.lower()
         haystack = record.unit_code.lower() + " " + " ".join(
-            str(v).lower() for v in (record.data or {}).values() if v is not None
+            str(v).lower()
+            for k, v in (record.data or {}).items()
+            if v is not None and k in visible
         )
         if needle not in haystack:
             return False
@@ -37,6 +57,8 @@ def _matches_filters(record: Record, search: str | None, filters: dict[str, str]
         cell = record.data.get(key) if record.data else None
         if key == "unit_code":
             cell = record.unit_code
+        elif key not in visible:
+            cell = None
         if cell is None or val.lower() not in str(cell).lower():
             return False
     return True
@@ -55,7 +77,9 @@ def list_records(
     sort: str | None = None,   # field key or "unit_code"
     order: str = "asc",        # "asc" | "desc"
 ):
-    """List records — every role can read every record and every column.
+    """List records — every role reads every record. Columns are scoped per
+    record: full access to the ones it has worked on, own section + base identity
+    on the ones it hasn't (see rbac.visible_fields).
 
     Filtering/sorting is done in Python for portability; adequate for the v1
     small-team scale. Swap to SQL/JSONB predicates when the dataset grows.
@@ -72,12 +96,17 @@ def list_records(
         stmt = stmt.where(Record.is_archived.is_(False))
     all_records = db.execute(stmt).scalars().all()
 
-    matched = [r for r in all_records if _matches_filters(r, search, filters)]
+    matched = [r for r in all_records if _matches_filters(r, search, filters, role)]
 
     # Sort across the whole result set so pagination stays correct.
     if sort and (sort in ALL_KEYS or sort == "unit_code"):
         def key_fn(r: Record):
-            val = r.unit_code if sort == "unit_code" else (r.data or {}).get(sort)
+            if sort == "unit_code":
+                val = r.unit_code
+            elif sort in visible_fields(role, r.data):
+                val = (r.data or {}).get(sort)
+            else:
+                val = None  # sorts with the blanks; never reveals the hidden value
             # (has_value, lowercased string) keeps blanks last and sorts naturally.
             return (val is None or val == "", str(val).lower() if val is not None else "")
         matched.sort(key=key_fn, reverse=(order == "desc"))
@@ -87,7 +116,7 @@ def list_records(
     total = len(matched)
     start = (page - 1) * page_size
     return RecordPage(
-        items=[_out(r) for r in matched[start : start + page_size]],
+        items=[_out(r, role) for r in matched[start : start + page_size]],
         total=total,
         page=page,
         page_size=page_size,
@@ -120,7 +149,7 @@ def create_record(
     apply_changes(db, record, clean, user)
     db.commit()
     db.refresh(record)
-    return _out(record)
+    return _out(record, role)
 
 
 @router.get("/{record_id}", response_model=RecordOut)
@@ -133,7 +162,7 @@ def get_record(
     record = db.get(Record, record_id)
     if not record:
         raise HTTPException(404, detail="Record not found.")
-    return _out(record)
+    return _out(record, role)
 
 
 @router.patch("/{record_id}", response_model=RecordOut)
@@ -173,7 +202,7 @@ def patch_record(
     if not changed:
         # Nothing actually changed; still a valid 200 with current state.
         pass
-    return _out(record)
+    return _out(record, role)
 
 
 @router.post("/{record_id}/archive", response_model=RecordOut)
@@ -190,7 +219,7 @@ def archive_record(
     record.is_archived = True
     db.commit()
     db.refresh(record)
-    return _out(record)
+    return _out(record, role)
 
 
 @router.post("/{record_id}/unarchive", response_model=RecordOut)
@@ -207,21 +236,58 @@ def unarchive_record(
     record.is_archived = False
     db.commit()
     db.refresh(record)
-    return _out(record)
+    return _out(record, role)
+
+
+@router.get("/{record_id}/events", response_model=list[RecordEventOut])
+def record_events(
+    record_id: int,
+    db: Session = Depends(get_db),
+    role: Role = Depends(current_role),
+    _user: User = Depends(get_current_user),
+):
+    """Imported filing/pullout/scanning history, newest first. Undated events
+    sort last — the same order the importer replays them in, reversed."""
+    record = db.get(Record, record_id)
+    if not record:
+        raise HTTPException(404, detail="Record not found.")
+    vis = visible_fields(role, record.data)
+    rows = (
+        db.execute(
+            select(RecordEvent)
+            .where(RecordEvent.record_id == record_id)
+            .order_by(RecordEvent.event_date.desc().nullslast(), RecordEvent.id.desc())
+        )
+        .scalars()
+        .all()
+    )
+    out = []
+    for ev in rows:
+        item = RecordEventOut.model_validate(ev)
+        # A field the caller may not read is no less sensitive inside history.
+        item.data = {k: v for k, v in (ev.data or {}).items() if k in vis}
+        out.append(item)
+    return out
 
 
 @router.get("/{record_id}/audit", response_model=list[AuditOut])
 def record_audit(
     record_id: int,
     db: Session = Depends(get_db),
+    role: Role = Depends(current_role),
     _user: User = Depends(get_current_user),
 ):
-    if not db.get(Record, record_id):
+    record = db.get(Record, record_id)
+    if not record:
         raise HTTPException(404, detail="Record not found.")
     rows = (
         db.execute(
             select(AuditLog)
-            .where(AuditLog.record_id == record_id)
+            .where(
+                AuditLog.record_id == record_id,
+                # History of a column the caller can't read is just as sensitive.
+                AuditLog.field_name.in_(visible_fields(role, record.data)),
+            )
             .order_by(AuditLog.changed_at.desc())
         )
         .scalars()

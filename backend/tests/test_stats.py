@@ -44,3 +44,19 @@ def test_breakdown_covers_every_role_and_totals_match():
     for role in compute_stats(records)["roles"]:
         counted = sum(e["n"] for b in role["breakdown"].values() for e in b)
         assert counted == role["total"] == 1, role["role"]
+
+
+def test_compliance_buckets_the_workbooks_own_vocabulary():
+    """The real SOMA3 file says "Completed"/"Not needed", not "Signed" — both
+    vocabularies have to land in the same buckets or the donut reads 0%."""
+    records = [
+        _rec(spa_status="Completed"),
+        _rec(spa_status="Not needed"),   # nothing left for compliance to do
+        _rec(spa_status="No Copy"),
+        _rec(spa_status="Signed"),       # prototype vocabulary still works
+        _rec(spa_status=""),
+    ]
+    compliance = compute_stats(records)["roles"][0]
+    assert compliance["role"] == "document_compliance"
+    assert compliance["done"] == 3
+    assert compliance["pending"] == 2

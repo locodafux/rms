@@ -57,9 +57,17 @@ export default function ExportPage() {
             Job #{job.id}: <span className="badge">{job.status}</span>
             {job.status === "done" && (
               <p style={{ marginTop: 10 }}>
-                <a className="btn sm" href={api.exportDownloadUrl(job.id)}>
+                <button
+                  className="btn sm"
+                  onClick={() =>
+                    api.download(
+                      `/api/export/${job.id}/download`,
+                      `docutrack_export.${job.fmt}`,
+                    )
+                  }
+                >
                   ⭳ Download ({job.row_count} rows)
-                </a>
+                </button>
               </p>
             )}
             {job.status === "error" && <div className="error">{job.error}</div>}

@@ -5,6 +5,7 @@ from datetime import date, datetime, timezone
 from sqlalchemy import (
     JSON,
     Boolean,
+    Date,
     DateTime,
     ForeignKey,
     Integer,
@@ -43,6 +44,9 @@ class User(Base):
     full_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
     # None until an admin assigns one of the five roles.
     role: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    # fields.GEO values this user is responsible for; [] means unrestricted, not
+    # uncovered. Imports are gated by it (see services.importer).
+    geos: Mapped[list] = mapped_column(JSON, default=list, nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=False)
     is_superuser: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
@@ -80,6 +84,32 @@ class Record(Base):
         if not since:
             return None
         return ARCHIVE_COUNTDOWN_DAYS - (date.today() - date.fromisoformat(since)).days
+
+
+class RecordEvent(Base):
+    """One filing / pullout / scanning event.
+
+    The team workbooks are event logs, not registers: a unit is filed, relocated
+    and pulled out repeatedly, and each row is a real event (one unit has 38).
+    Merging them into Record.data alone would keep only the last row, so rows
+    land here and Record.data is derived from them (latest event wins per field).
+    """
+
+    __tablename__ = "record_events"
+    __table_args__ = (UniqueConstraint("dedupe_key", name="uq_event_dedupe"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    record_id: Mapped[int] = mapped_column(ForeignKey("records.id"), index=True)
+    kind: Mapped[str] = mapped_column(String(16), index=True)  # filed|pullout|scanned
+    event_date: Mapped[date | None] = mapped_column(Date, nullable=True, index=True)
+    data: Mapped[dict] = mapped_column(JSON, default=dict)  # canonical field keys
+    source_job_id: Mapped[int | None] = mapped_column(
+        ForeignKey("import_jobs.id"), nullable=True
+    )
+    # sha256 of the row's identity: re-importing a living workbook must not
+    # double every event, while a genuinely new event on the same day is its own.
+    dedupe_key: Mapped[str] = mapped_column(String(64), index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 
 class Attachment(Base):

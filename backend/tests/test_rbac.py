@@ -173,20 +173,71 @@ def test_doc_compliance_cannot_create_with_foreign_field(client):
 
 
 @pytest.mark.parametrize("role", list(FOREIGN_FIELD))
-def test_every_role_reads_every_field(client, role):
-    """Read access is unrestricted: the 403 above is about writes, not visibility."""
+def test_role_cannot_read_other_sections_of_a_new_record(client, role):
+    """Until a role has worked a record, other sections are invisible on every
+    read path — not merely a 403 on write."""
     rid = _make_record(client)
     admin = token_for(client, "admin")
     key, value = FOREIGN_FIELD[role]
     client.patch(f"/api/records/{rid}", headers=auth(admin), json={"data": {key: value}})
 
     tok = token_for(client, role)
-    assert client.get(f"/api/records/{rid}", headers=auth(tok)).json()["data"][key] == value
+    assert key not in client.get(f"/api/records/{rid}", headers=auth(tok)).json()["data"]
     listed = client.get("/api/records", headers=auth(tok)).json()["items"]
-    assert listed[0]["data"][key] == value
-    schema_keys = {f["key"] for f in client.get("/api/meta/schema", headers=auth(tok)).json()["fields"]}
-    assert key in schema_keys
-    assert any(a["field_name"] == key for a in client.get(f"/api/records/{rid}/audit", headers=auth(tok)).json())
+    assert key not in listed[0]["data"]
+    assert not any(
+        a["field_name"] == key
+        for a in client.get(f"/api/records/{rid}/audit", headers=auth(tok)).json()
+    )
+    # Search must not match on a hidden value either, or it leaks by probing.
+    hits = client.get("/api/records", headers=auth(tok), params={"search": value}).json()
+    assert hits["total"] == 0
+    assert client.get(f"/api/records/{rid}", headers=auth(tok)).json()["restricted"] is True
+
+
+@pytest.mark.parametrize("role", list(FOREIGN_FIELD))
+def test_own_section_input_unlocks_the_whole_record(client, role):
+    """Once the role has filled its section, that record opens up in full."""
+    rid = _make_record(client)
+    admin = token_for(client, "admin")
+    key, value = FOREIGN_FIELD[role]
+    client.patch(f"/api/records/{rid}", headers=auth(admin), json={"data": {key: value}})
+
+    tok = token_for(client, role)
+    own_key, own_value = OWN_FIELD[role]
+    r = client.patch(
+        f"/api/records/{rid}",
+        headers=auth(tok),
+        json={"data": full_section(client, tok) | {own_key: own_value}},
+    )
+    assert r.status_code == 200, r.text
+
+    assert r.json()["data"][key] == value          # unlocked in the save response
+    assert r.json()["restricted"] is False
+    got = client.get(f"/api/records/{rid}", headers=auth(tok)).json()
+    assert got["data"][key] == value               # ...and on re-read
+    listed = client.get("/api/records", headers=auth(tok)).json()["items"]
+    assert listed[0]["data"][key] == value         # ...and in the list/other tabs
+    hits = client.get("/api/records", headers=auth(tok), params={"search": value}).json()
+    assert hits["total"] == 1                      # ...and it is searchable now
+    assert any(
+        a["field_name"] == key
+        for a in client.get(f"/api/records/{rid}/audit", headers=auth(tok)).json()
+    )
+
+
+@pytest.mark.parametrize("role", list(OWN_FIELD))
+def test_role_reads_base_and_own_section(client, role):
+    """Unit/buyer identity stays visible to everyone; so does the role's own section."""
+    rid = _make_record(client)
+    tok = token_for(client, role)
+    key, value = OWN_FIELD[role]
+    client.patch(
+        f"/api/records/{rid}", headers=auth(tok), json={"data": full_section(client, tok) | {key: value}}
+    )
+    data = client.get(f"/api/records/{rid}", headers=auth(tok)).json()["data"]
+    assert data["company"] == "Acme"  # base field, owned by nobody's section
+    assert data[key] == value
 
 
 def test_default_editable_matches_registry():

@@ -3,6 +3,7 @@ import ReactDOM from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
 import { AuthProvider } from "./auth";
 import App from "./App";
+import "./theme"; // sets data-theme on <html> before the first render
 import "./styles.css";
 
 ReactDOM.createRoot(document.getElementById("root")!).render(

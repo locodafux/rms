@@ -13,6 +13,8 @@ export interface User {
   is_active: boolean;
   is_superuser: boolean;
   created_at: string;
+  /** Geo areas this user covers; empty = unrestricted (imports not gated). */
+  geos: string[];
 }
 
 /** Presence row from GET /api/meta/online — last activity, not a real session. */
@@ -31,6 +33,23 @@ export interface ChatMessage {
   role: Role | null;
   body: string;
   created_at: string;
+}
+
+/** One upload in the Files tab (GET /api/import). */
+export interface ImportFile {
+  id: number;
+  status: string;
+  filename: string;
+  total_rows: number;
+  processed_rows: number;
+  inserted: number;
+  updated: number;
+  errors: { row: number | null; sheet?: string | null; error: string }[];
+  created_at: string;
+  uploaded_by: string | null;
+  uploaded_by_role: Role | null;
+  /** False once the original has been cleared from job storage. */
+  file_available: boolean;
 }
 
 export interface FieldDef {
@@ -52,6 +71,8 @@ export interface SchemaResponse {
   can_import: boolean;
   can_export: boolean;
   can_manage_users: boolean;
+  /** role -> sections that role's import may fill. Admin gets every role. */
+  import_scopes: Record<string, string[]>;
   fields: FieldDef[];
 }
 
@@ -66,6 +87,31 @@ export interface RecordItem {
   updated_at: string;
   attachments: Attachment[];
   archive_countdown_days: number | null;
+  /** This role hasn't worked this record yet, so other sections' values are
+   *  withheld — a missing key here may be hidden rather than empty. */
+  restricted: boolean;
+}
+
+/** One imported filing / pullout / scanning event (GET /api/records/:id/events). */
+export interface RecordEvent {
+  id: number;
+  kind: "filed" | "pullout" | "scanned";
+  event_date: string | null;
+  data: Record<string, any>;
+  source_job_id: number | null;
+}
+
+/** A row on the cross-record History page (GET /api/history). */
+export interface HistoryItem extends RecordEvent {
+  record_id: number;
+  unit_code: string;
+}
+
+export interface HistoryPage {
+  items: HistoryItem[];
+  total: number;
+  page: number;
+  page_size: number;
 }
 
 export interface RecordPage {

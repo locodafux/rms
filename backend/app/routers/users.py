@@ -34,6 +34,8 @@ def update_user(
         if user.id == admin.id and payload.is_active is False:
             raise HTTPException(400, detail="You cannot deactivate your own account.")
         user.is_active = payload.is_active
+    if payload.geos is not None:
+        user.geos = payload.geos
     db.commit()
     db.refresh(user)
     return user

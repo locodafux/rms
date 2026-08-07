@@ -7,7 +7,16 @@ from slowapi.errors import RateLimitExceeded
 
 from app.config import settings
 from app.database import Base, engine
-from app.routers import auth, records, attachments, chat, importexport, users, meta
+from app.routers import (
+    auth,
+    records,
+    attachments,
+    chat,
+    history,
+    importexport,
+    users,
+    meta,
+)
 from app.routers.auth import limiter
 
 app = FastAPI(title="DocuTrack Registry API", version="1.0.0")
@@ -43,3 +52,4 @@ app.include_router(records.router)
 app.include_router(attachments.router)
 app.include_router(importexport.router)
 app.include_router(chat.router)
+app.include_router(history.router)

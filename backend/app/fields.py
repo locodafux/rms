@@ -54,7 +54,7 @@ class Field:
 
 
 # --- Enum option sets (verbatim from docutrack.html) ------------------------
-GEO = ("SOMA1", "SOMA2", "SOMA3", "NOMA1", "NOMA2")
+GEO = ("SOMA1", "SOMA2", "SOMA3", "NOMA1", "NOMA2", "VISMIN")
 UNIT_STATUS = ("Reserved", "Contracted", "Booked", "Fallout", "Backout", "Cancelled")
 MODE_OF_PAYMENT = ("ADA", "spot cash", "PDC")
 SPA_STATUS = ("N/A", "Pending Preparation", "For Signing", "Signed", "Released", "Notarized")
@@ -79,7 +79,8 @@ F = Role.filing
 T = FieldType
 
 
-# --- The registry: 120 fields, in workbook column order --------------------
+# --- The registry: 133 fields, in workbook column order --------------------
+# 120 from the production workbook, plus 13 carried only by the team workbooks.
 FIELDS: tuple[Field, ...] = (
     # 3.1 Unit & Project Information (base) — cols 0-16
     Field("unit_code", "Unit Code", "Unit & Project Info", BASE),
@@ -99,10 +100,19 @@ FIELDS: tuple[Field, ...] = (
     Field("bank_finance", "Bank Finance", "Unit & Project Info", BASE),
     Field("tcp", "TCP", "Unit & Project Info", BASE, T.number),
     Field("la", "LA", "Unit & Project Info", BASE, T.number),
+    # Identity/reference columns carried by the team workbooks (see
+    # services.importer sheet profiles). Not in the original 120 — added so
+    # nothing in a source file is dropped on the floor.
+    Field("ref", "Ref", "Unit & Project Info", BASE),
+    Field("dr_date", "DR Date", "Unit & Project Info", BASE, T.date),
+    Field("seq_no", "No.", "Unit & Project Info", BASE),
+    Field("ph", "PH", "Unit & Project Info", BASE),
+    Field("cs_date", "CS Date", "Unit & Project Info", BASE, T.date),
 
     # 3.1 Buyer's Information (base) — cols 17-29
     Field("last_name", "Last Name", "Buyer's Info", BASE),
     Field("suffix", "Suffix", "Buyer's Info", BASE),
+    Field("suffix_name", "Suffix Name", "Buyer's Info", BASE),
     Field("first_name", "First Name", "Buyer's Info", BASE),
     Field("middle_name", "Middle Name", "Buyer's Info", BASE),
     Field("citizenship", "Citizenship", "Buyer's Info", BASE),
@@ -149,6 +159,8 @@ FIELDS: tuple[Field, ...] = (
     Field("date_received_scanning", "Date Received (Scanning)", "Scanning", S, T.date),
     Field("date_scanned", "Date Scanned", "Scanning", S, T.date),
     Field("scanning_remarks", "Scanning Remarks", "Scanning", S, T.longtext),
+    Field("scanning_submitted_documents", "Submitted Documents", "Scanning", S, T.longtext),
+    Field("scanning_verified_by", "Scanning — Verified By", "Scanning", S),
 
     # 3.4 Notary — cols 59-65
     Field("notary_status", "Notary Status", "Notary Status", N),
@@ -164,6 +176,10 @@ FIELDS: tuple[Field, ...] = (
     Field("file_status", "File Status", "Filing System Entry", F, T.enum, FILE_STATUS),
     Field("date_filed", "Date Filed", "Filing System Entry", F, T.date),
     Field("filing_location", "Filing Location", "Filing System Entry", F),
+    Field("date_received_filing", "Date Received (Filing)", "Filing System Entry", F, T.date),
+    Field("filed_docs_list", "List of Docs Filed / Docket", "Filing System Entry", F, T.longtext),
+    Field("filing_verified_by", "Filing — Verified By", "Filing System Entry", F),
+    Field("filing_remarks", "Filing — Remarks", "Filing System Entry", F, T.longtext),
     # Pullout Request — cols 70-76
     Field("pullout_requested_by", "Pullout — Requested By", "Pullout Request", F),
     Field("pullout_type_of_documents", "Pullout — Type of Documents", "Pullout Request", F),
@@ -172,6 +188,7 @@ FIELDS: tuple[Field, ...] = (
     Field("pullout_date_pullout", "Pullout — Date Pullout", "Pullout Request", F, T.date),
     Field("pullout_returned_docs", "Pullout — Returned Docs", "Pullout Request", F),
     Field("pullout_remarks", "Pullout — Remarks", "Pullout Request", F, T.longtext),
+    Field("pullout_verified_by", "Pullout — Verified By", "Pullout Request", F),
     # DOAS Notary Status — cols 77-82
     Field("doas_pullout_by", "DOAS — Pullout By", "DOAS Notary Status", F),
     Field("doas_requested_date_pullout", "DOAS — Requested Date Pullout", "DOAS Notary Status", F, T.date),
@@ -186,11 +203,12 @@ FIELDS: tuple[Field, ...] = (
     Field("arch_location", "Archiving — Location", "Archiving/Disposal", F),
     Field("arch_date_disposal", "Archiving — Date Disposal", "Archiving/Disposal", F, T.date),
     Field("arch_remarks", "Archiving — Remarks", "Archiving/Disposal", F, T.longtext),
-    # BOI Status Entry — cols 89-92
-    Field("boi_entry_status", "BOI Status Entry — BOI Status", "BOI Status Entry", F, T.enum, BOI_ENTRY_STATUS),
-    Field("boi_entry_date_submitted", "BOI Status Entry — Date Submitted", "BOI Status Entry", F, T.date),
-    Field("boi_entry_ncpa_submitted_to", "BOI Status Entry — NCPA Submitted To", "BOI Status Entry", F),
-    Field("boi_entry_remarks", "BOI Status Entry — Remarks", "BOI Status Entry", F, T.longtext),
+    # BOI Status Entry — cols 89-92. Owned by Document Compliance, not Filing;
+    # the columns keep their workbook position so import/export stay aligned.
+    Field("boi_entry_status", "BOI Status Entry — BOI Status", "BOI Status Entry", D, T.enum, BOI_ENTRY_STATUS),
+    Field("boi_entry_date_submitted", "BOI Status Entry — Date Submitted", "BOI Status Entry", D, T.date),
+    Field("boi_entry_ncpa_submitted_to", "BOI Status Entry — NCPA Submitted To", "BOI Status Entry", D),
+    Field("boi_entry_remarks", "BOI Status Entry — Remarks", "BOI Status Entry", D, T.longtext),
 
     # 3.2 Document Checklist (27 items, owned by Document Compliance) — cols 93-119
     Field("chk_buyers_info_sheet", "Document Checklist — Buyer's Info Sheet", "Document Checklist", D),
@@ -227,6 +245,12 @@ FIELDS: tuple[Field, ...] = (
 FIELDS_BY_KEY: dict[str, Field] = {f.key: f for f in FIELDS}
 ALL_KEYS: frozenset[str] = frozenset(FIELDS_BY_KEY)
 BASE_KEYS: frozenset[str] = frozenset(f.key for f in FIELDS if f.owner == BASE)
+BUYER_KEYS: frozenset[str] = frozenset(f.key for f in FIELDS if f.section == "Buyer's Info")
+# Ticks record which documents arrived; a missing one is a fact, not an
+# unfinished form, so these never count toward "section complete".
+CHECKLIST_KEYS: frozenset[str] = frozenset(
+    f.key for f in FIELDS if f.section == "Document Checklist"
+)
 
 
 def keys_for_owner(owner) -> frozenset[str]:

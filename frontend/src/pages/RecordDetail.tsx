@@ -2,7 +2,13 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { api, ApiError } from "../api";
 import { useAuth } from "../auth";
-import type { Attachment, AuditEntry, FieldDef, RecordItem } from "../types";
+import type {
+  Attachment,
+  AuditEntry,
+  FieldDef,
+  RecordEvent,
+  RecordItem,
+} from "../types";
 
 function FieldInput({
   f,
@@ -16,6 +22,17 @@ function FieldInput({
   onChange: (v: any) => void;
 }) {
   const common = { disabled, value: value ?? "", onChange: (e: any) => onChange(e.target.value) };
+  // A tick means the document arrived. Undo it while it's still unsaved; once
+  // saved the caller disables it, so a recorded document can't be un-recorded.
+  if (f.section === "Document Checklist")
+    return (
+      <input
+        type="checkbox"
+        checked={!!value}
+        disabled={disabled}
+        onChange={() => onChange(value ? "" : "Yes")}
+      />
+    );
   if (f.type === "enum")
     return (
       <select {...common}>
@@ -45,7 +62,8 @@ export default function RecordDetail({ mode }: { mode: "new" | "edit" }) {
   const [busy, setBusy] = useState(false);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [audit, setAudit] = useState<AuditEntry[]>([]);
-  const [tab, setTab] = useState<"form" | "attachments" | "audit">("form");
+  const [events, setEvents] = useState<RecordEvent[]>([]);
+  const [tab, setTab] = useState<"form" | "attachments" | "history" | "audit">("form");
   const fileRef = useRef<HTMLInputElement>(null);
 
   const fields = schema?.fields ?? [];
@@ -61,6 +79,7 @@ export default function RecordDetail({ mode }: { mode: "new" | "edit" }) {
     });
     api.attachments(rid).then(setAttachments);
     api.audit(rid).then(setAudit);
+    api.events(rid).then(setEvents);
   }, [id, isNew]);
 
   // group fields by section preserving registry order
@@ -74,6 +93,16 @@ export default function RecordDetail({ mode }: { mode: "new" | "edit" }) {
       }
       s.fields.push(f);
     }
+    // Registry order is workbook column order, which strands two compliance-owned
+    // sections down in the filing block. On screen they belong above the
+    // compliance section they feed. Order of the calls is the order on screen.
+    const lift = (name: string) => {
+      const i = map.findIndex((m) => m.name === name);
+      const j = map.findIndex((m) => m.name === "Compliance Team");
+      if (i > j && j > -1) map.splice(j, 0, ...map.splice(i, 1));
+    };
+    lift("BOI Status Entry");
+    lift("Document Checklist");
     return map;
   }, [fields]);
 
@@ -81,9 +110,23 @@ export default function RecordDetail({ mode }: { mode: "new" | "edit" }) {
     return isNew ? f.creatable : f.editable;
   }
 
+  /** Until this role has filled its own section, the other sections arrive empty
+   *  because the server withholds them — say so rather than showing bare blanks. */
+  function isWithheld(s: { fields: FieldDef[] }) {
+    return (
+      !!record?.restricted &&
+      s.fields.every((f) => f.owner !== "base" && f.owner !== schema?.role)
+    );
+  }
+
   function setField(key: string, v: any) {
     setForm((prev) => ({ ...prev, [key]: v }));
     setDirty((d) => new Set(d).add(key));
+  }
+
+  // Already saved checklist ticks are permanent.
+  function isLocked(f: FieldDef) {
+    return f.section === "Document Checklist" && !!record?.data?.[f.key];
   }
 
   // Fields this role must complete before the server will accept a save.
@@ -92,7 +135,9 @@ export default function RecordDetail({ mode }: { mode: "new" | "edit" }) {
     ? []
     : fields.filter((f) => f.required && (form[f.key] ?? "") === "");
 
-  async function save() {
+  /** `extra` carries a value React state hasn't committed yet (checklist ticks,
+   *  which save the moment they're clicked). */
+  async function save(extra?: Record<string, any>) {
     setMsg({});
     if (missing.length) {
       setMsg({
@@ -111,8 +156,8 @@ export default function RecordDetail({ mode }: { mode: "new" | "edit" }) {
         setMsg({ ok: "Record created." });
         nav(`/records/${created.id}`);
       } else {
-        const payload: Record<string, any> = {};
-        for (const k of dirty) payload[k] = form[k];
+        const payload: Record<string, any> = { ...extra };
+        for (const k of dirty) payload[k] ??= form[k];
         const updated = await api.patchRecord(record!.id, payload, record!.version);
         setRecord(updated);
         setForm(updated.data);
@@ -189,7 +234,7 @@ export default function RecordDetail({ mode }: { mode: "new" | "edit" }) {
           </button>
         )}
         {(anyWritable || isNew) && (
-          <button className="btn" onClick={save} disabled={busy || (dirty.size === 0 && !isNew)}>
+          <button className="btn" onClick={() => save()} disabled={busy || (dirty.size === 0 && !isNew)}>
             {busy ? "…" : isNew ? "Create" : "Save changes"}
           </button>
         )}
@@ -208,6 +253,12 @@ export default function RecordDetail({ mode }: { mode: "new" | "edit" }) {
             onClick={() => setTab("attachments")}
           >
             Attachments ({attachments.length})
+          </button>
+          <button
+            className={`tab ${tab === "history" ? "active" : ""}`}
+            onClick={() => setTab("history")}
+          >
+            History ({events.length})
           </button>
           <button className={`tab ${tab === "audit" ? "active" : ""}`} onClick={() => setTab("audit")}>
             Audit ({audit.length})
@@ -233,7 +284,12 @@ export default function RecordDetail({ mode }: { mode: "new" | "edit" }) {
           {sections.map((s) => (
             <div className="form-section" key={s.name}>
               <h3>{s.name}</h3>
-              <div className="grid">
+              {isWithheld(s) && (
+                <p className="muted" style={{ marginTop: -8, fontSize: 13 }}>
+                  🔒 Hidden until you fill in your own section.
+                </p>
+              )}
+              <div className={`grid ${s.name === "Document Checklist" ? "grid-3" : ""}`}>
                 {s.fields
                   .filter((f) => f.key !== "unit_code")
                   .map((f) => (
@@ -245,8 +301,12 @@ export default function RecordDetail({ mode }: { mode: "new" | "edit" }) {
                       <FieldInput
                         f={f}
                         value={form[f.key]}
-                        disabled={!canWrite(f)}
-                        onChange={(v) => setField(f.key, v)}
+                        disabled={!canWrite(f) || isLocked(f)}
+                        onChange={(v) => {
+                          setField(f.key, v);
+                          if (v && !isNew && f.section === "Document Checklist")
+                            save({ [f.key]: v });
+                        }}
                       />
                     </div>
                   ))}
@@ -301,9 +361,17 @@ export default function RecordDetail({ mode }: { mode: "new" | "edit" }) {
                     <td>{(a.size / 1024).toFixed(0)} KB</td>
                     <td className="muted">{new Date(a.uploaded_at).toLocaleString()}</td>
                     <td>
-                      <a href={api.downloadUrl(record.id, a.id)} target="_blank" rel="noreferrer">
+                      <button
+                        className="btn ghost sm"
+                        onClick={() =>
+                          api.download(
+                            `/api/records/${record.id}/attachments/${a.id}/download`,
+                            a.filename,
+                          )
+                        }
+                      >
                         Download
-                      </a>
+                      </button>
                     </td>
                   </tr>
                 ))}
@@ -317,6 +385,49 @@ export default function RecordDetail({ mode }: { mode: "new" | "edit" }) {
               </tbody>
             </table>
           </div>
+        </div>
+      )}
+
+      {tab === "history" && (
+        <div className="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Event</th>
+                <th>Details</th>
+              </tr>
+            </thead>
+            <tbody>
+              {events.map((ev) => (
+                <tr key={ev.id}>
+                  <td className="muted">{ev.event_date ?? "no date"}</td>
+                  <td>
+                    <span className="badge">{ev.kind}</span>
+                  </td>
+                  <td>
+                    {/* Field labels come from the registry, so a renamed column
+                        never leaves a raw key on screen. */}
+                    {Object.entries(ev.data).map(([k, v]) => (
+                      <div key={k}>
+                        <span className="muted">
+                          {fields.find((f) => f.key === k)?.label ?? k}:
+                        </span>{" "}
+                        {String(v)}
+                      </div>
+                    ))}
+                  </td>
+                </tr>
+              ))}
+              {events.length === 0 && (
+                <tr>
+                  <td colSpan={3} className="muted">
+                    No imported filing, pullout or scanning events for this unit.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
         </div>
       )}
 

@@ -57,9 +57,12 @@ export default function Records() {
   const nav = useNavigate();
   const { schema } = useAuth();
   const [params, setParams] = useSearchParams();
-  // View lives in the URL; the sidebar's Compliance/Scanning/Notary/Filing
-  // links are the only way to switch it.
-  const v = params.get("view") ?? "";
+  // View lives in the URL, set by the sidebar links and the compliance tab strip.
+  // The dashboard deep-links by role key, and the compliance role is named
+  // "document_compliance" server-side — alias it here so it doesn't fall through
+  // to the default view.
+  const raw = params.get("view") ?? "";
+  const v = raw === "document_compliance" ? "compliance" : raw;
   const view: keyof typeof VIEWS = v in VIEWS ? (v as keyof typeof VIEWS) : "filing";
   const [page, setPage] = useState(1);
   const [pageSize] = useState(25);
@@ -99,8 +102,19 @@ export default function Records() {
 
   // enum options per field key, so status columns get a dropdown of choices.
   const optionsByKey: Record<string, string[]> = {};
-  for (const f of schema?.fields ?? [])
+  const ownerByKey: Record<string, string> = {};
+  for (const f of schema?.fields ?? []) {
     if (f.type === "enum") optionsByKey[f.key] = f.options;
+    ownerByKey[f.key] = f.owner;
+  }
+
+  /** Cell text. A record this role hasn't worked yet arrives without the other
+   *  sections' values — show a lock, so withheld never reads as "not done yet". */
+  function cell(r: RecordItem, key: string): string {
+    const owner = ownerByKey[key];
+    if (r.restricted && owner !== "base" && owner !== schema?.role) return "🔒";
+    return String(r.data[key] ?? "—");
+  }
 
   function toggleSort(key: string) {
     if (sort === key) {
@@ -145,7 +159,6 @@ export default function Records() {
   return (
     <div>
       <div className="page-head">
-        {/* Without the tab strip this is the only thing naming the current view. */}
         <h1>{VIEWS[view].label}</h1>
         <div className="spacer" />
         {schema?.can_create && (
@@ -201,7 +214,7 @@ export default function Records() {
                     <button
                       className="col-filter-btn"
                       title="Filter this column"
-                      style={{ color: active ? "var(--brand)" : "#a9b6cc" }}
+                      style={{ color: active ? "var(--brand-ink)" : "var(--muted)" }}
                       onClick={(e) => {
                         e.stopPropagation();
                         setOpenCol(openCol === key ? null : key);
@@ -266,7 +279,7 @@ export default function Records() {
                     ) : key.endsWith("status") && r.data[key] ? (
                       <span className="badge">{r.data[key]}</span>
                     ) : (
-                      String(r.data[key] ?? "—")
+                      cell(r, key)
                     )}
                   </td>
                 ))}
@@ -304,7 +317,7 @@ export default function Records() {
                 {key.endsWith("status") && r.data[key] ? (
                   <span className="badge">{r.data[key]}</span>
                 ) : (
-                  <span>{String(r.data[key] ?? "—")}</span>
+                  <span>{cell(r, key)}</span>
                 )}
               </div>
             ))}

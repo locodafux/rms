@@ -4,11 +4,12 @@ import { api } from "../api";
 import { useAuth } from "../auth";
 import type { Bucket, RecordItem, RoleStat, Stats } from "../types";
 
-// CVD-safe status palette (validated light-mode): done / incoming / pending.
+// CVD-safe status palette: done / incoming / pending. The literals — and the
+// lighter dark-mode variants — live on :root in styles.css.
 const C = {
-  done: "#2f9e44",
-  incoming: "#4c6ef5",
-  pending: "#c77800",
+  done: "var(--st-done)",
+  incoming: "var(--st-incoming)",
+  pending: "var(--st-pending)",
 };
 
 const BUCKETS: { key: Bucket; label: string; color: string }[] = [
@@ -145,7 +146,9 @@ function Donut({ s }: { s: RoleStat }) {
               cx="21"
               cy="21"
               r={R}
-              stroke={a.color}
+              // style, not the stroke attribute: var() is not substituted in
+              // SVG presentation attributes.
+              style={{ stroke: a.color }}
               strokeDasharray={`${dash} ${100 - dash}`}
               strokeDashoffset={-start}
               transform="rotate(-90 21 21)"
@@ -348,7 +351,7 @@ export default function Dashboard() {
                   </td>
                   <td>{r.data.company ?? "—"}</td>
                   <td>{r.data.unit_status ? <span className="badge">{r.data.unit_status}</span> : "—"}</td>
-                  <td>{r.data.file_status ?? "—"}</td>
+                  <td>{r.data.file_status ?? (r.restricted ? "🔒" : "—")}</td>
                   <td className="muted">{new Date(r.updated_at).toLocaleDateString()}</td>
                 </tr>
               ))}

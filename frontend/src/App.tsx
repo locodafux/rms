@@ -5,9 +5,12 @@ import Dashboard from "./pages/Dashboard";
 import Records from "./pages/Records";
 import RecordDetail from "./pages/RecordDetail";
 import ImportPage from "./pages/ImportPage";
+import Files from "./pages/Files";
+import History from "./pages/History";
 import ExportPage from "./pages/ExportPage";
 import Users from "./pages/Users";
 import ChatBox from "./ChatBox";
+import { getTheme, setTheme, Theme, THEMES } from "./theme";
 import { useState } from "react";
 
 const ROLE_LABEL: Record<string, string> = {
@@ -17,6 +20,30 @@ const ROLE_LABEL: Record<string, string> = {
   filing: "Filing",
   notary: "Notary",
 };
+
+const cap = (s: string) => s[0].toUpperCase() + s.slice(1);
+
+const THEME_ICON: Record<Theme, string> = { system: "◐", light: "☀", dark: "☾" };
+
+/* One button cycling System → Light → Dark. Keeps state only because the icon
+   has to track the choice; localStorage stays the source of truth. */
+function ThemeToggle() {
+  const [theme, setLocal] = useState(getTheme);
+  const next = THEMES[(THEMES.indexOf(theme) + 1) % THEMES.length];
+  return (
+    <button
+      className="theme-toggle"
+      aria-label={`Color theme: ${cap(theme)}. Switch to ${cap(next)}.`}
+      title={`Theme: ${cap(theme)} — click for ${cap(next)}`}
+      onClick={() => {
+        setTheme(next);
+        setLocal(next);
+      }}
+    >
+      {THEME_ICON[theme]}
+    </button>
+  );
+}
 
 function Shell() {
   const { user, schema, logout } = useAuth();
@@ -37,9 +64,10 @@ function Shell() {
     .map((s) => s[0]?.toUpperCase())
     .join("");
 
-  // NavLink ignores the query string, so the two /records views are matched by hand.
+  // NavLink ignores the query string, so the /records views are matched by hand.
   function navCls(view: string) {
-    const current = new URLSearchParams(loc.search).get("view") ?? "filing";
+    let current = new URLSearchParams(loc.search).get("view") ?? "filing";
+    if (current === "document_compliance") current = "compliance";
     const active = loc.pathname === "/records" && current === view;
     return `navlink ${active ? "active" : ""}`;
   }
@@ -70,6 +98,14 @@ function Shell() {
             Import
           </NavLink>
         )}
+        <NavLink to="/history" className="navlink">
+          History
+        </NavLink>
+        {schema?.can_import && (
+          <NavLink to="/files" className="navlink">
+            Files
+          </NavLink>
+        )}
         {schema?.can_export && (
           <NavLink to="/export" className="navlink">
             Export
@@ -96,6 +132,7 @@ function Shell() {
           <div className="userbox">
             <span className="rolebadge">{ROLE_LABEL[user.role ?? ""] ?? "No role"}</span>
             <div className="avatar">{initials}</div>
+            <ThemeToggle />
             <button className="btn ghost sm" onClick={logout}>
               Logout
             </button>
@@ -107,7 +144,9 @@ function Shell() {
             <Route path="/records" element={<Records />} />
             <Route path="/records/new" element={<RecordDetail mode="new" />} />
             <Route path="/records/:id" element={<RecordDetail mode="edit" />} />
+            <Route path="/history" element={<History />} />
             {schema?.can_import && <Route path="/import" element={<ImportPage />} />}
+            {schema?.can_import && <Route path="/files" element={<Files />} />}
             {schema?.can_export && <Route path="/export" element={<ExportPage />} />}
             {schema?.can_manage_users && <Route path="/users" element={<Users />} />}
             <Route path="*" element={<Navigate to="/" />} />

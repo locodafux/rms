@@ -17,9 +17,15 @@ BLANK_LABEL = "(not set)"
 
 
 def _bucket_compliance(v: str) -> str:
-    if v in {"Signed", "Released", "Notarized"}:
+    """SPA Status arrives in two vocabularies: the prototype's enum, and the one
+    the SOMA3 workbook actually uses ("Not needed" / "Completed" / "No Copy" /
+    "Lacking Copy"). Both are bucketed, so the donut works whichever a file
+    speaks. "Not needed" is done: a unit that needs no SPA has nothing left for
+    compliance to do."""
+    lv = v.lower()
+    if lv in {"signed", "released", "notarized", "completed", "complete", "not needed"}:
         return "done"
-    if v in {"For Signing"}:
+    if lv in {"for signing", "pending preparation"}:
         return "incoming"
     return "pending"
 

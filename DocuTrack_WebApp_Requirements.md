@@ -23,15 +23,15 @@ Replace the local-storage-only HTML prototype with a proper server-backed applic
 | Role | Create Entry | View Records | Edit Own Section Columns | Edit Other Sections | Import | Export | Manage Users |
 |---|---|---|---|---|---|---|---|
 | **Admin** | ✅ | ✅ (all) | ✅ (all columns) | ✅ (all columns) | ✅ | ✅ | ✅ |
-| **Document Compliance** | ✅ | ✅ (all) | ✅ (Compliance Team columns only) | ❌ | ❌ | ❌ | ❌ |
-| **Scanning** | ❌ | ✅ (all) | ✅ (Scanning of Documents columns only) | ❌ | ❌ | ❌ | ❌ |
-| **Filing** | ❌ | ✅ (all) | ✅ (Filing System Entry columns only) | ❌ | ❌ | ❌ | ❌ |
-| **Notary** | ❌ | ✅ (all) | ✅ (Notary Status columns only) | ❌ | ❌ | ❌ | ❌ |
+| **Document Compliance** | ✅ | ✅ (all) | ✅ (Compliance Team columns only) | ❌ | ✅ (own columns) | ❌ | ❌ |
+| **Scanning** | ❌ | ✅ (all) | ✅ (Scanning of Documents columns only) | ❌ | ✅ (own columns, updates only) | ❌ | ❌ |
+| **Filing** | ❌ | ✅ (all) | ✅ (Filing System Entry columns only) | ❌ | ✅ (own columns, updates only) | ❌ | ❌ |
+| **Notary** | ❌ | ✅ (all) | ✅ (Notary Status columns only) | ❌ | ✅ (own columns, updates only) | ❌ | ❌ |
 
 Notes:
-- All roles can **view** every record and every column (read access is unrestricted) — restriction is on **write/update**, scoped to a fixed set of columns per role.
+- All roles can **view** every record, but column visibility is decided **per record**. A record the role has not worked yet exposes only its **own section** plus the shared base columns (Unit & Project Info, Buyer's Info, BOI Status); the rest is withheld on every read path — list, detail, search/filter/sort, audit trail. Once the role has entered any value in its own section on that record, the record unlocks **in full** for that role. **Write** access never widens beyond the role's own section. Admin sees and edits everything.
 - Only **Admin** and **Document Compliance** can create a new Unit Code record (the base Unit/Project Info and Buyer's Info sections are filled in at creation, most logically by whoever is bringing the file into the system).
-- Import (Excel → database) should be available to Admin at minimum; decide during clarification whether Document Compliance may also import (see Open Questions).
+- Import (Excel → database) is open to **every role**, scoped per account: an upload only writes the columns that role owns (same allow-list as manual editing), and roles that cannot create records can only update existing Unit Codes. Admin imports all columns.
 - Export (database → Excel/CSV) is Admin-only, full stop.
 - Enforcement must happen **server-side** on every write endpoint (field allow-list per role), not just hidden in the UI — the UI should also disable/hide fields the current user can't edit, but the API must independently re-validate. Never trust client-submitted role/field claims.
 
@@ -47,7 +47,7 @@ Notes:
 `BOI Start of Commercial Operations` — *BOI Status*
 
 ### 3.2 Document Compliance role columns
-`Doc Compliance Officer, Date Received from SAS, Date Transmitted to Scanning, Cleared Date, Account Location, Mode of Payment, PB/SPS/CB1/CB2/AIF Valid ID (Primary & Secondary — 10 fields), Lacking Remarks, SPA Status, SPA Type, SPA No. of Copies, Date Transmitted for Scanning, SPA Remarks, Compliance Team Remarks`, plus the 27-item **Document Checklist** (Buyer's Info Sheet, Co-Buyer Info Sheet, Computation Sheet, CPA, Buyer's Guide, House Specs, DOAS, UHLA, CB-UHLA, BIR 1904, BIR 2316, CB 1904, CB BIR 2316, PB/CB CENOMAR, PB/CB Marriage Certificate, PB/CB COE, PB/CB Payslip, Proof of Billing, Bank Statement, Annual Financial Statement, Business ITR, DTI/SEC Cert, Exit and Entry Stamp).
+`Doc Compliance Officer, Date Received from SAS, Date Transmitted to Scanning, Cleared Date, Account Location, Mode of Payment, PB/SPS/CB1/CB2/AIF Valid ID (Primary & Secondary — 10 fields), Lacking Remarks, SPA Status, SPA Type, SPA No. of Copies, Date Transmitted for Scanning, SPA Remarks, Compliance Team Remarks`, plus **BOI Status Entry** (`BOI Status, Date Submitted, NCPA Submitted To, Remarks`) and the 27-item **Document Checklist** (Buyer's Info Sheet, Co-Buyer Info Sheet, Computation Sheet, CPA, Buyer's Guide, House Specs, DOAS, UHLA, CB-UHLA, BIR 1904, BIR 2316, CB 1904, CB BIR 2316, PB/CB CENOMAR, PB/CB Marriage Certificate, PB/CB COE, PB/CB Payslip, Proof of Billing, Bank Statement, Annual Financial Statement, Business ITR, DTI/SEC Cert, Exit and Entry Stamp).
 
 ### 3.3 Scanning role columns
 `Docket Scanning Status, Scanning AO, Date Received (Scanning), Date Scanned, Scanning Remarks`
@@ -56,7 +56,7 @@ Notes:
 `Notary Status, Account Officer, NCPA Notary Date, Endorsement Date, NCPA Email Sent Date, Notarized By, Notary Remarks`
 
 ### 3.5 Filing role columns
-`Filing & Archiving Officer, File Status, Date Filed, Filing Location`, plus **Pullout Request** (`Requested By, Type of Documents, Requesting Dept/Group, Request Date, Date Pullout, Returned Docs, Remarks`), **DOAS Notary Status** (`Pullout By, Requested Date Pullout, DOAS Status, N-DOAS Date Returned, Return By, Remarks`), **Archiving/Disposal** (`Accounts Status, Pullout Date, Archived Date, Location, Date Disposal, Remarks`), and **BOI Status Entry** (`BOI Status, Date Submitted, NCPA Submitted To, Remarks`).
+`Filing & Archiving Officer, File Status, Date Filed, Filing Location`, plus **Pullout Request** (`Requested By, Type of Documents, Requesting Dept/Group, Request Date, Date Pullout, Returned Docs, Remarks`), **DOAS Notary Status** (`Pullout By, Requested Date Pullout, DOAS Status, N-DOAS Date Returned, Return By, Remarks`), and **Archiving/Disposal** (`Accounts Status, Pullout Date, Archived Date, Location, Date Disposal, Remarks`). *(BOI Status Entry sits in the workbook's filing block but is owned by Document Compliance — see 3.2.)*
 
 ### 3.6 Attachments
 Scanned documents (PDF/image, up to 10MB each, unlimited count) attach to a record. Recommend: Scanning role uploads scan attachments; all roles can view/download; no deletion (append-only), matching prototype behavior.
@@ -154,10 +154,10 @@ Scanned documents (PDF/image, up to 10MB each, unlimited count) attach to a reco
 > ### RBAC — the core requirement, treat it as highest-risk
 > Enforce, **server-side on every write**, a fixed allow-list of editable fields per role. The allow-lists come directly from Section 3:
 > - `admin`: all fields, plus user management, Import, and Export.
-> - `document_compliance`: may **create** records (fills Unit & Project Info + Buyer's Info + BOI Start-of-Commercial-Operations at creation) and may edit only the Section 3.2 Compliance Team fields (officer, dates, account location, mode of payment, the 10 valid-ID fields, lacking remarks, SPA fields, and the 27-item document checklist).
+> - `document_compliance`: may **create** records (fills Unit & Project Info + Buyer's Info + BOI Start-of-Commercial-Operations at creation) and may edit only the Section 3.2 Compliance Team fields (officer, dates, account location, mode of payment, the 10 valid-ID fields, lacking remarks, SPA fields, the 27-item document checklist, and the BOI Status Entry fields).
 > - `scanning`: cannot create; may edit only the Section 3.3 fields.
 > - `notary`: cannot create; may edit only the Section 3.4 fields.
-> - `filing`: cannot create; may edit only the Section 3.5 fields (incl. Pullout Request, DOAS Notary Status, Archiving/Disposal, BOI Status Entry).
+> - `filing`: cannot create; may edit only the Section 3.5 fields (incl. Pullout Request, DOAS Notary Status, Archiving/Disposal).
 > - **All roles** can read/search/filter every record and column. Any write touching a field outside the caller's allow-list returns **403** with the offending field name(s), even if the UI would never surface that field. Never trust client-submitted role or field claims. Prefer a **table-driven** allow-list (`role_field_permissions`) so permissions can change without a redeploy, but ship with the Section 3 mapping seeded.
 >
 > ### Records API

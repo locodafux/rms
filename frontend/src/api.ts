@@ -128,6 +128,21 @@ export const api = {
     request(`/api/records/${id}/unarchive`, { method: "POST" }),
   audit: (id: number) =>
     request<import("./types").AuditEntry[]>(`/api/records/${id}/audit`),
+  events: (id: number) =>
+    request<import("./types").RecordEvent[]>(`/api/records/${id}/events`),
+  /** Cross-record event history. days=0 means all time (undated events included). */
+  history: (q: {
+    search?: string;
+    days?: number;
+    kind?: string;
+    page?: number;
+    page_size?: number;
+  }) => {
+    const qs = new URLSearchParams();
+    for (const [k, v] of Object.entries(q))
+      if (v !== "" && v != null) qs.set(k, String(v));
+    return request<import("./types").HistoryPage>(`/api/history?${qs}`);
+  },
 
   attachments: (id: number) =>
     request<import("./types").Attachment[]>(`/api/records/${id}/attachments`),
@@ -139,11 +154,11 @@ export const api = {
       { method: "POST", body: fd },
     );
   },
-  downloadUrl: (recordId: number, attId: number) =>
-    `${BASE}/api/records/${recordId}/attachments/${attId}/download`,
-
   users: () => request<import("./types").User[]>("/api/users"),
-  updateUser: (id: number, body: { role?: string; is_active?: boolean }) =>
+  updateUser: (
+    id: number,
+    body: { role?: string; is_active?: boolean; geos?: string[] },
+  ) =>
     request<import("./types").User>(`/api/users/${id}`, {
       method: "PATCH",
       body: JSON.stringify(body),
@@ -154,12 +169,27 @@ export const api = {
     fd.append("file", file);
     return request<any>("/api/import/preview", { method: "POST", body: fd });
   },
-  startImport: (file: File) => {
+  /** asUserId scopes the import to that user's role (admin only, see /api/import). */
+  startImport: (file: File, asUserId?: number) => {
     const fd = new FormData();
     fd.append("file", file);
+    if (asUserId != null) fd.append("as_user_id", String(asUserId));
     return request<any>("/api/import", { method: "POST", body: fd });
   },
   importStatus: (id: number) => request<any>(`/api/import/${id}`),
+  /** Every file uploaded through Import (admin: everyone's, else your own). */
+  imports: () => request<import("./types").ImportFile[]>("/api/import"),
+  /** Fetches with the auth header, then saves — a plain <a href> to one of
+   *  these endpoints sends no token and just 401s. */
+  async download(path: string, filename: string) {
+    const resp = await request<Response>(path);
+    const url = URL.createObjectURL(await resp.blob());
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+  },
   startExport: (fmt: string, includeArchived: boolean) => {
     const fd = new FormData();
     fd.append("fmt", fmt);
@@ -167,5 +197,4 @@ export const api = {
     return request<any>("/api/export", { method: "POST", body: fd });
   },
   exportStatus: (id: number) => request<any>(`/api/export/${id}`),
-  exportDownloadUrl: (id: number) => `${BASE}/api/export/${id}/download`,
 };
